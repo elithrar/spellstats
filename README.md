@@ -6,6 +6,9 @@
 
 SpellStats shows what a cast will heal or damage and how much mana it will cost, right on your World of Warcraft: Forever action buttons, including EllesmereUI Action Bars. By default, healing spells show the estimated median heal on top and the percentage of your maximum mana spent on the bottom, both in and out of combat.
 
+<img width="451" height="340" alt="image" src="https://github.com/user-attachments/assets/c4327e9f-a67e-4f78-b787-0c161c5b65f5" />
+<img width="857" height="880" alt="image" src="https://github.com/user-attachments/assets/b51fd26a-5bbe-459d-88bc-b0937a8e00ae" />
+
 ## Installation
 
 For a manual install, extract the ZIP into your Forever client’s `Interface/AddOns/` directory and restart WoW. SomethingNeedDoing is bundled.
