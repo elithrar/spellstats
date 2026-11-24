@@ -52,33 +52,82 @@ local function attackPower(getPower)
     end
 end
 
+-- Forever can restrict player-stat reads in combat. Keep only this player's
+-- last readable, out-of-combat inputs. Action identities and costs stay live.
+local playerStats = {}
+local function observed(key, value, valid)
+    if InCombatLockdown() then
+        if valid then return value end
+        return playerStats[key]
+    end
+    if valid then
+        playerStats[key] = value
+        return value
+    end
+end
+
+local function numberStat(key, value, positive)
+    return observed(key, value, values.Number(value) and (not positive or value > 0))
+end
+
+local function playerLevel() return numberStat("level", UnitLevel("player"), true) end
+local function maxHealth() return numberStat("maxHealth", UnitHealthMax("player"), true) end
+local function bonusHealing() return numberStat("healing", GetSpellBonusHealing()) end
+local function schoolPower(school) return numberStat(school, GetSpellBonusDamage(school)) end
+local function meleePower() return numberStat("melee", attackPower(UnitAttackPower)) end
+local function rangedPower() return numberStat("ranged", attackPower(UnitRangedAttackPower)) end
+local function playerSpirit()
+    local _, effective = UnitStat("player", 5)
+    return numberStat("spirit", effective)
+end
+local function talentKnown(id)
+    local known = C_SpellBook.IsSpellKnown(id)
+    return observed("talent:" .. id, known, values.Readable(known) and type(known) == "boolean")
+end
+
+function ns.RefreshPlayerStats()
+    if InCombatLockdown() then return end
+    playerLevel()
+    bonusHealing()
+    for school = 1, 7 do schoolPower(school) end
+    meleePower()
+    rangedPower()
+    playerSpirit()
+    maxHealth()
+    talentKnown(1328621) -- Bloom adds a Spirit-based component to druid heals.
+end
+
 local function spellPower(rank, effect, kind)
-    if kind == "heal" then return GetSpellBonusHealing() end
-    if effect.school or not rank.schools then return GetSpellBonusDamage(effect.school or rank.school) end
+    if kind == "heal" then return bonusHealing() end
+    if effect.school or not rank.schools then return schoolPower(effect.school or rank.school) end
     local highest
     for _, school in ipairs(rank.schools) do
-        local bonus = GetSpellBonusDamage(school)
-        if not values.Number(bonus) then return end
+        local bonus = schoolPower(school)
+        if not bonus then return end
         highest = math.max(highest or bonus, bonus)
     end
     return highest
 end
 
 local function magnitude(rank, effect, kind, level, share)
-    if effect.talent and not C_SpellBook.IsSpellKnown(effect.talent) then return 0 end
+    if effect.talent then
+        local known = talentKnown(effect.talent)
+        if known == nil then return end
+        if not known then return 0 end
+    end
     local amount = (effect.low + effect.high) / 2
     if effect.curve then
         local constant, linear, quadratic = unpack(effect.curve)
         amount = amount * (constant + level * (linear + level * quadratic))
     end
     if effect.spirit then
-        local _, spirit = UnitStat("player", 5)
-        if not values.Number(spirit) then return end
+        local spirit = playerSpirit()
+        if not spirit then return end
         amount = amount + spirit * effect.spirit
     end
     if effect.health and effect.health ~= 0 then
-        local health = UnitHealthMax("player")
-        if not values.Number(health) or health <= 0 then return end
+        local health = maxHealth()
+        if not health then return end
         amount = amount + health * effect.health
     end
     if effect.perLevel and effect.perLevel ~= 0 then
@@ -88,16 +137,16 @@ local function magnitude(rank, effect, kind, level, share)
     end
     if effect.sp and effect.sp ~= 0 then
         local power = spellPower(rank, effect, kind)
-        if not values.Number(power) then return end
+        if not power then return end
         amount = amount + power * effect.sp * share
     end
     if effect.ap and effect.ap ~= 0 then
-        local power = attackPower(UnitAttackPower)
+        local power = meleePower()
         if not power then return end
         amount = amount + power * effect.ap
     end
     if effect.rap and effect.rap ~= 0 then
-        local power = attackPower(UnitRangedAttackPower)
+        local power = rangedPower()
         if not power then return end
         amount = amount + power * effect.rap
     end
@@ -113,14 +162,13 @@ function ns.Estimate(spellID)
     result.isHeal = rank.kind == "heal"
     if #rank.components == 0 then return result end
 
-    local level = UnitLevel("player")
-    local hasLevel = values.Number(level) and level > 0
-    local share = hasLevel and spellPowerShare(spellID, rank, level)
+    local level = playerLevel()
+    local share = level and spellPowerShare(spellID, rank, level)
     local missingHeal, missingDamage = false, false
     for _, effect in ipairs(rank.components) do
         local kind = effect.kind or rank.kind
         if kind == "heal" or effect.leech then result.isHeal = true end
-        local amount = hasLevel and magnitude(rank, effect, kind, level, share)
+        local amount = level and magnitude(rank, effect, kind, level, share)
         if amount then
             result[kind] = (result[kind] or 0) + amount
             -- Leech restores a fraction of the damage the spell deals. Use the

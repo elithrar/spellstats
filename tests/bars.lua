@@ -1,6 +1,7 @@
 -- Run from the SpellStats project root with texlua tests/bars.lua.
 local events, timers, spells, measured = {}, {}, {}, {}
 local inCombat = false
+local captures = 0
 local secret = {}
 local settings = {
     topStat = "heal", bottomStat = "manaPercent", spellFilter = "heals", visibility = "always",
@@ -19,6 +20,10 @@ local ns = {
     }},
     SpellData = {[403] = {allMana = true}},
     GetSettings = function() return settings end,
+    RefreshPlayerStats = function()
+        assert(not inCombat, "never replace pre-combat player stats in lockdown")
+        captures = captures + 1
+    end,
     MaxMana = function() return maxMana end,
     Estimate = function(id)
         measured[id] = (measured[id] or 0) + 1
@@ -101,6 +106,7 @@ assert(loadfile("SpellStats/Bars.lua"))("SpellStats", ns)
 ns.StartBars(app, scope)
 events.PLAYER_ENTERING_WORLD()
 frame()
+assert(captures == 1, "startup and world entry should coalesce")
 local top, bottom = primary.TextOverlayContainer.labels[1], primary.TextOverlayContainer.labels[2]
 local macroTop = second.TextOverlayContainer.labels[1]
 assert(top.value == "182" and macroTop.value == "182" and bottom.value == "6.1%")
@@ -351,4 +357,52 @@ frame()
 assert(eabLines[1].value == "", "restricted macro identity leaves the rows empty")
 assert(#eabLines == 2 and #customLines == 2, "repeated displays must reuse the two labels")
 assert(next(timers) == nil, "Ellesmere bars should also be idle after rendering")
+
+-- Exercise the real rank model for a priest whose action bars only display
+-- SpellStats in combat. Renew first appears on a different page mid-pull.
+assert(loadfile("SpellStats/SpellData.lua"))("SpellStats", ns)
+Enum = {PowerType = {Mana = 0}}
+local healing, charge = 100, 200
+function UnitLevel() return inCombat and secret or 20 end
+function GetSpellBonusHealing() return inCombat and secret or healing end
+function GetSpellBonusDamage() return 0 end
+function UnitAttackPower() return 0, 0, 0 end
+function UnitRangedAttackPower() return 0, 0, 0 end
+function UnitStat() return 40, 40 end
+function UnitHealthMax() return 800 end
+function UnitPowerMax() return 1000 end
+C_SpellBook = {IsSpellKnown = function() return false end}
+C_Spell.GetSpellPowerCost = function() return {{type = 0, cost = charge}} end
+assert(loadfile("SpellStats/Model.lua"))("SpellStats", ns)
+local captureStats = ns.RefreshPlayerStats
+ns.RefreshPlayerStats = function()
+    assert(not inCombat)
+    captures = captures + 1
+    captureStats()
+end
+settings.visibility = "combat"
+spells[109], spells[119] = {"spell", 2061}, {"spell", 139}
+events.PLAYER_ENTERING_WORLD()
+frame()
+local before = captures
+healing = 250
+events.UNIT_AURA("player")
+events.PLAYER_EQUIPMENT_CHANGED()
+frame()
+assert(captures == before + 1 and eabLines[1].value == "", "capture changed gear even while rows are hidden")
+inCombat = true
+events.PLAYER_REGEN_DISABLED()
+events.PLAYER_TARGET_CHANGED()
+frame()
+assert(eabLines[1].value == "301" and eabLines[2].value == "20%", "Flash Heal uses the pre-pull bonus")
+EABButton1.currentSlot, charge = 119, 50
+EABButton1:OnAttributeChanged("action", 119)
+events.UNIT_AURA("player")
+frame()
+assert(eabLines[1].value == "295" and eabLines[2].value == "5%", "unseen Renew uses pre-pull power and its current mana cost")
+assert(captures == before + 1)
+inCombat, healing, settings.visibility = false, 0, "always"
+events.PLAYER_REGEN_ENABLED()
+frame()
+assert(captures == before + 2 and eabLines[1].value == "45", "combat exit refreshes player stats, including zero")
 print("Action button overlay checks passed.")

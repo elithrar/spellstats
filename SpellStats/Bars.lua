@@ -10,6 +10,7 @@ local barNames = {
 local app, scope
 local buttons, estimates, variableCosts = {}, {}, {}
 local refreshPending = false
+local playerStatsDirty = false
 local ellesmereModule, scanEllesmere, discoverEllesmere
 local colors = {
     heal = {0.40, 1.00, 0.45},
@@ -227,8 +228,15 @@ local function refresh()
         scanEllesmere = false
         discoverEllesmere()
     end
-    local settings = ns.GetSettings()
     local inCombat = InCombatLockdown()
+    -- A heal may first appear on another page after combat begins, even
+    -- when no labels were visible before the pull. Capture player inputs
+    -- independently of the selected slots and the visibility setting.
+    if playerStatsDirty then
+        playerStatsDirty = false
+        if not inCombat then ns.RefreshPlayerStats() end
+    end
+    local settings = ns.GetSettings()
     local visible = settings.visibility == "always" or
         (settings.visibility == "combat" and inCombat) or
         (settings.visibility == "peace" and not inCombat)
@@ -274,6 +282,7 @@ end
 -- reuse estimates for spells which remain on a visible button.
 local function invalidate()
     estimates = {}
+    playerStatsDirty = true
     queueRefresh()
 end
 

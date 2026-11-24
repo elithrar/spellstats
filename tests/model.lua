@@ -6,6 +6,8 @@ function issecretvalue(value) return value == secret end
 Enum = {PowerType = {Mana = 0}}
 unpack = unpack or table.unpack
 local level, healing, damage, maxMana = 20, 100, 200, 1250
+local inCombat = false
+function InCombatLockdown() return inCombat end
 function UnitLevel() return level end
 function GetSpellBonusHealing() return healing end
 function GetSpellBonusDamage(school)
@@ -18,7 +20,7 @@ function UnitHealthMax() return 2000 end
 function UnitPower(unit, power) assert(unit == "player" and power == 0); return 900 end
 function UnitAttackPower() return 98, 4, -2 end
 function UnitRangedAttackPower() return 148, 5, -3 end
-local costs, bloomKnown
+local costs, bloomKnown = nil, false
 C_SpellBook = {IsSpellKnown = function(id) assert(id == 1328621); return bloomKnown end}
 function UnitStat(unit, index) assert(index == 5); return 120, 125, 5, 0 end
 C_Spell = {GetSpellPowerCost = function() return costs end}
@@ -133,4 +135,43 @@ for id, rank in pairs(ns.SpellData) do
     end
     count = count + 1
 end
+
+-- An in-combat reload has no prior character sample. A readable cost still
+-- belongs to this cast even when its Priest Heal rank 3 magnitude is unknown.
+local fresh = {SomethingNeedDoing = ns.SomethingNeedDoing, SpellData = ns.SpellData}
+assert(loadfile("SpellStats/Model.lua"))("SpellStats", fresh)
+inCombat, level, healing, damage = true, 36, secret, secret
+costs = {{type = 0, cost = 140}}
+local cast = fresh.Estimate(6063)
+assert(cast.isHeal and cast.heal == nil and cast.cost == 140)
+healing, bloomKnown = 100, secret
+assert(fresh.Estimate(3627).heal == nil) -- unknown talent state cannot count as unlearned
+
+-- Snapshot all schools with no spell on a bar, then page to new spells while
+-- stats are restricted. A proc's current cost and the player's current mana
+-- must never be replaced by the precombat cost or mana.
+inCombat, healing, damage, maxMana, bloomKnown = false, 100, 200, 1000, false
+fresh.RefreshPlayerStats()
+inCombat, level, healing, damage, bloomKnown = true, secret, secret, secret, secret
+costs, maxMana = {{type = 0, cost = 0}}, secret
+cast = fresh.Estimate(6063)
+near(cast.heal, 628.7)
+assert(cast.cost == 0 and fresh.MaxMana() == nil)
+near(fresh.Estimate(116).damage, 40.15) -- downranked Frostbolt with 200 Frost power
+near(fresh.Estimate(3627).heal, 284) -- Rejuvenation 6, with Bloom known to be absent
+costs = {{type = 0, cost = secret}}
+assert(fresh.Estimate(6063).cost == nil)
+
+healing = 150 -- readable combat buff applies, without replacing the baseline
+near(fresh.Estimate(6063).heal, 671.55)
+fresh.RefreshPlayerStats()
+healing = secret
+near(fresh.Estimate(6063).heal, 628.7)
+inCombat = false
+assert(fresh.Estimate(6063).heal == nil)
+level, healing, bloomKnown = 36, 0, false
+fresh.RefreshPlayerStats() -- zero bonus healing is a valid new baseline
+inCombat, healing = true, secret
+near(fresh.Estimate(6063).heal, 543)
+
 print("SpellStats model fixtures passed (" .. count .. " shipped ranks checked)")
