@@ -37,16 +37,17 @@ jobs:
       - name: Verify version tag and Forever client metadata
         id: metadata
         run: python3 tools/release.py
-      - name: Install validation tools
-        run: sudo apt-get update && sudo apt-get install -y lua5.4
+      - name: Install Lua 5.1 for Forever compatibility checks
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
       - name: Build and test the release ZIP
         run: |
           python3 tools/package.py
           unzip -q "dist/SpellStats-${RELEASE_TAG#v}.zip" -d "$RUNNER_TEMP/install"
           cd "$RUNNER_TEMP/install"
-          lua5.4 "$GITHUB_WORKSPACE/tests/model.lua"
-          lua5.4 "$GITHUB_WORKSPACE/tests/bars.lua"
-          lua5.4 "$GITHUB_WORKSPACE/tests/settings.lua"
+          find SpellStats -name '*.lua' -exec luac5.1 -p {} \;
+          lua5.1 "$GITHUB_WORKSPACE/tests/model.lua"
+          lua5.1 "$GITHUB_WORKSPACE/tests/bars.lua"
+          lua5.1 "$GITHUB_WORKSPACE/tests/settings.lua"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-package
