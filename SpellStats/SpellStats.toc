@@ -1,0 +1,19 @@
+## Interface: 16001
+## Title: SpellStats
+## Notes: Show healing, damage, and mana estimates on action buttons.
+## Version: 0.1.0
+## IconTexture: Interface\AddOns\SpellStats\Media\Icon
+## SavedVariables: SpellStatsDB, SpellInsightDB
+## OptionalDeps: LibSharedMedia-3.0
+
+Libs/SomethingNeedDoing/Core.lua
+Libs/SomethingNeedDoing/Diagnostics.lua
+Libs/SomethingNeedDoing/Scope.lua
+Libs/SomethingNeedDoing/State.lua
+Libs/SomethingNeedDoing/Settings.lua
+Libs/SomethingNeedDoing/UI.lua
+Libs/SomethingNeedDoing/Options.lua
+SpellData.lua
+Model.lua
+Bars.lua
+Core.lua
