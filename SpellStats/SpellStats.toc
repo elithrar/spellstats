@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: SpellStats
 ## Notes: Show healing, damage, and mana estimates on action buttons.
-## Version: 0.1.0
+## Version: 0.1.1
 ## IconTexture: Interface\AddOns\SpellStats\Media\Icon
 ## SavedVariables: SpellStatsDB, SpellInsightDB
 ## OptionalDeps: LibSharedMedia-3.0
