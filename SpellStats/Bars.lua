@@ -137,45 +137,56 @@ local anchors = {
 
 -- Reserve space only where the text actually lies. Blizzard gives its hotkey
 -- a wide region, and EllesmereUI lets players move each caption independently.
-local function clearance(caption, edge, boundary, rowHeight, rowLeft, rowRight)
-    if not caption or not caption:IsShown() then return 2 end
+local function measureCaption(caption, rect)
+    rect.left = nil
+    local shown = caption and caption:IsShown()
+    rect.shown = values.Readable(shown) and shown
+    if not rect.shown then return end
     local alpha = caption:GetAlpha()
-    if not values.Number(alpha) or alpha <= 0 then return 2 end
+    if not values.Number(alpha) or alpha <= 0 then return end
     local text = caption:GetText()
-    if not values.Readable(text) or not text or text == "" then return 2 end
+    if not values.Readable(text) or not text or text == "" then return end
     local left, bottom, width, height = caption:GetRect()
     if not values.Number(left) or not values.Number(bottom) or
-        not values.Number(width) or not values.Number(height) then return 2 end
+        not values.Number(width) or not values.Number(height) then return end
     local ink = caption:GetStringWidth()
-    if not values.Number(ink) or ink <= 0 then return 2 end
+    if not values.Number(ink) or ink <= 0 then return end
     ink = math.min(width, ink)
     local justification = caption:GetJustifyH()
-    if not values.Readable(justification) then return 2 end
+    if not values.Readable(justification) then return end
     if justification == "RIGHT" then
         left = left + width - ink
     elseif justification == "CENTER" then
         left = left + (width - ink) / 2
     end
-    if rowRight <= left or rowLeft >= left + ink then return 2 end
-    if edge == "TOP" and bottom < boundary and bottom + height > boundary - 2 - rowHeight then
-        return boundary - bottom
-    elseif edge == "BOTTOM" and bottom + height > boundary and bottom < boundary + 2 + rowHeight then
-        return bottom + height - boundary
-    end
-    return 2
+    rect.left, rect.right, rect.bottom, rect.top = left, left + ink, bottom, bottom + height
 end
 
-local function rowInset(button, line, edge, anchor, left, bottom, width, height)
+local function rowInset(line, edge, anchor, left, bottom, width, height, captions)
     if not line.value or not left then return 2 end
     local textWidth, textHeight = line.text:GetStringWidth(), line.text:GetStringHeight()
     if not values.Number(textWidth) or not values.Number(textHeight) then return 2 end
     local rowLeft = left + (width - textWidth) * anchor.fraction + anchor.x
     local rowRight = rowLeft + textWidth
-    local boundary = edge == "TOP" and bottom + height or bottom
-    local inset = math.max(
-        clearance(button.Name, edge, boundary, textHeight, rowLeft, rowRight),
-        clearance(button.HotKey, edge, boundary, textHeight, rowLeft, rowRight),
-        clearance(button.Count, edge, boundary, textHeight, rowLeft, rowRight))
+    local inset = 2
+    -- Moving past one caption can put the row against another. Each pass
+    -- advances beyond at least one of the three measured rectangles or ends.
+    for pass = 1, #captions do
+        local previous = inset
+        for i = 1, #captions do
+            local rect = captions[i]
+            if rect.left and rowLeft < rect.right and rowRight > rect.left then
+                local near, far
+                if edge == "TOP" then
+                    near, far = bottom + height - rect.top, bottom + height - rect.bottom
+                else
+                    near, far = rect.bottom - bottom, rect.top - bottom
+                end
+                if near < inset + textHeight and far > inset then inset = far end
+            end
+        end
+        if inset == previous then break end
+    end
     return math.max(2, math.min(inset, height - textHeight - 2)), rowLeft, rowRight, textHeight
 end
 
@@ -187,6 +198,43 @@ local function placeLine(line, owner, edge, anchor, inset)
         line.text:SetJustifyH(anchor.justify)
         line.anchor, line.inset = anchor, inset
     end
+end
+
+local function layoutRows(record, settings)
+    local button = record.button
+    local owner = button.TextOverlayContainer or button
+    local topAnchor = anchors[settings.topAlign] or anchors.LEFT
+    local bottomAnchor = anchors[settings.bottomAlign] or anchors.LEFT
+    local left, base, width, height
+    local captions = record.captions
+    if button.Name or button.HotKey or button.Count then
+        left, base, width, height = owner:GetRect()
+        if values.Number(left) and values.Number(base) and values.Number(width) and values.Number(height) then
+            if not captions then
+                captions = {{}, {}, {}}
+                record.captions = captions
+            end
+            measureCaption(button.HotKey, captions[1])
+            measureCaption(button.Name, captions[2])
+            measureCaption(button.Count, captions[3])
+        else
+            left = nil
+        end
+    end
+    local topInset, topLeft, topRight, topHeight = rowInset(record.top, "TOP", topAnchor, left, base, width, height, captions)
+    local bottomInset, bottomLeft, bottomRight, bottomHeight = rowInset(record.bottom, "BOTTOM", bottomAnchor, left, base, width, height, captions)
+    if topLeft and bottomLeft and topRight > bottomLeft and bottomRight > topLeft then
+        -- If both captions use this column, share the available vertical
+        -- space before the two SpellStats lines would cross each other.
+        local available = math.max(0, height - topHeight - bottomHeight - 4)
+        local requested = topInset + bottomInset - 4
+        if requested > available then
+            topInset = 2 + math.floor((topInset - 2) * available / requested)
+            bottomInset = 2 + available - (topInset - 2)
+        end
+    end
+    placeLine(record.top, owner, "TOP", topAnchor, topInset)
+    placeLine(record.bottom, owner, "BOTTOM", bottomAnchor, bottomInset)
 end
 
 -- Each real or preview button keeps a record so settings changes move the
@@ -204,29 +252,7 @@ function ns.PaintButtonStats(record, settings, estimate, maxMana)
     paintLine(record.top, top, topColor, settings.topSize, settings.outline)
     paintLine(record.bottom, bottom, bottomColor, settings.bottomSize, settings.outline)
     if not top and not bottom then return end
-    local topAnchor = anchors[settings.topAlign] or anchors.LEFT
-    local bottomAnchor = anchors[settings.bottomAlign] or anchors.LEFT
-    local left, base, width, height
-    if button.Name or button.HotKey or button.Count then
-        left, base, width, height = owner:GetRect()
-        if not (values.Number(left) and values.Number(base) and values.Number(width) and values.Number(height)) then
-            left = nil
-        end
-    end
-    local topInset, topLeft, topRight, topHeight = rowInset(button, record.top, "TOP", topAnchor, left, base, width, height)
-    local bottomInset, bottomLeft, bottomRight, bottomHeight = rowInset(button, record.bottom, "BOTTOM", bottomAnchor, left, base, width, height)
-    if topLeft and bottomLeft and topRight > bottomLeft and bottomRight > topLeft then
-        -- If both captions use this column, share the available vertical
-        -- space before the two SpellStats lines would cross each other.
-        local available = math.max(0, height - topHeight - bottomHeight - 4)
-        local requested = topInset + bottomInset - 4
-        if requested > available then
-            topInset = 2 + math.floor((topInset - 2) * available / requested)
-            bottomInset = 2 + available - (topInset - 2)
-        end
-    end
-    placeLine(record.top, owner, "TOP", topAnchor, topInset)
-    placeLine(record.bottom, owner, "BOTTOM", bottomAnchor, bottomInset)
+    layoutRows(record, settings)
 end
 
 local function refresh()
@@ -343,6 +369,18 @@ local function watchEllesmere()
     scanEllesmere = true
 end
 
+-- Blizzard's range update changes the color of bound shortcuts, but also
+-- shows or hides an unbound button's range dot. Only the latter needs layout.
+local rangeHooked
+local function rangeIndicatorChanged(button)
+    local record = buttons[button]
+    if not record or not record.captions or not (record.top.value or record.bottom.value) then return end
+    local shown = button.HotKey:IsShown()
+    if values.Readable(shown) and shown ~= record.captions[1].shown and button:IsVisible() then
+        layoutRows(record, ns.GetSettings())
+    end
+end
+
 local function discover()
     for _, name in ipairs(barNames) do
         local bar = _G[name]
@@ -351,6 +389,11 @@ local function discover()
                 watchButton(button, false)
             end
         end
+    end
+    if not rangeHooked and type(ActionButton_UpdateRangeIndicator) == "function" then
+        local ok, err = scope:PostHook(_G, "ActionButton_UpdateRangeIndicator", rangeIndicatorChanged)
+        rangeHooked = ok
+        if not ok then app.log:Warn("Could not watch native range indicators", {reason = err.message}) end
     end
     watchEllesmere()
     invalidate()
@@ -368,20 +411,25 @@ function ns.StartBars(owner, ownerScope)
         "ACTIONBAR_PAGE_CHANGED", "ACTIONBAR_SLOT_CHANGED", "ACTIONBAR_UPDATE_STATE", "UPDATE_BONUS_ACTIONBAR",
         "UPDATE_OVERRIDE_ACTIONBAR", "SPELL_UPDATE_ICON", "UPDATE_MACROS",
         "MODIFIER_STATE_CHANGED", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
-        "UPDATE_MOUSEOVER_UNIT", "UPDATE_BINDINGS", "SPELL_UPDATE_CHARGES",
+        "UPDATE_MOUSEOVER_UNIT", "UPDATE_BINDINGS", "GAME_PAD_ACTIVE_CHANGED", "SPELL_UPDATE_CHARGES",
     }) do
         listen(event, queueRefresh)
     end
+    local function talentsChanged()
+        ns.DirtyTalentRanks()
+        invalidate()
+    end
+    for _, event in ipairs({"SPELLS_CHANGED", "PLAYER_TALENT_UPDATE", "TRAIT_CONFIG_UPDATED", "PLAYER_REGEN_ENABLED"}) do
+        listen(event, talentsChanged)
+    end
     for _, event in ipairs({
         "PLAYER_DAMAGE_DONE_MODS", "SPELL_POWER_CHANGED", "PLAYER_EQUIPMENT_CHANGED",
-        "SPELLS_CHANGED", "PLAYER_LEVEL_UP", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
-        "ENCOUNTER_START", "ENCOUNTER_END",
-        "PLAYER_TALENT_UPDATE", "TRAIT_CONFIG_UPDATED", "UPDATE_SHAPESHIFT_FORM",
+        "PLAYER_LEVEL_UP", "PLAYER_REGEN_DISABLED", "ENCOUNTER_START", "ENCOUNTER_END", "UPDATE_SHAPESHIFT_FORM",
     }) do
         listen(event, invalidate)
     end
     local function activeTalentsChanged()
-        ns.ClearShieldTalentRanks()
+        ns.ClearTalentRanks()
         invalidate()
     end
     listen("ACTIVE_COMBAT_CONFIG_CHANGED", activeTalentsChanged)
@@ -397,8 +445,11 @@ function ns.StartBars(owner, ownerScope)
     local function playerChanged(unit)
         if values.Readable(unit) and unit == "player" then invalidate() end
     end
+    listen("UNIT_AURA", function(unit)
+        if not values.Readable(unit) or unit == "player" then invalidate() end
+    end)
     for _, event in ipairs({
-        "UNIT_AURA", "UNIT_STATS", "UNIT_MAXPOWER", "UNIT_DAMAGE", "UNIT_RANGEDDAMAGE",
+        "UNIT_STATS", "UNIT_MAXPOWER", "UNIT_DAMAGE", "UNIT_RANGEDDAMAGE",
         "UNIT_ATTACK_POWER", "UNIT_RANGED_ATTACK_POWER", "UNIT_MAXHEALTH",
     }) do
         listen(event, playerChanged)
@@ -416,6 +467,10 @@ function ns.StartBars(owner, ownerScope)
     listen("ADDON_LOADED", function(name)
         if name == "Blizzard_ActionBar" or name == "EllesmereUIActionBars" then discover() end
     end)
-    listen("PLAYER_ENTERING_WORLD", discover)
-    discover()
+    local function enterWorld()
+        ns.DirtyTalentRanks()
+        discover()
+    end
+    listen("PLAYER_ENTERING_WORLD", enterWorld)
+    enterWorld()
 end

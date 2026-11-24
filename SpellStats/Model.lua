@@ -73,6 +73,7 @@ end
 
 local function playerLevel() return numberStat("level", UnitLevel("player"), true) end
 local function maxHealth() return numberStat("maxHealth", UnitHealthMax("player"), true) end
+local function maxManaForPower() return numberStat("manaForPower", ns.MaxMana(), true) end
 local function bonusHealing() return numberStat("healing", GetSpellBonusHealing()) end
 local function schoolPower(school) return numberStat(school, GetSpellBonusDamage(school)) end
 local function meleePower() return numberStat("melee", attackPower(UnitAttackPower)) end
@@ -86,17 +87,30 @@ local function talentKnown(id)
     return observed("talent:" .. id, known, values.Readable(known) and type(known) == "boolean")
 end
 
--- Only committed ranks of these two Forever traits modify shield capacity.
 -- Check the entry's definition before using a node from the client export.
 -- Nodes: https://zephras.com/data/forever/enUS/talents/1.60.1.70938.json
--- Trait overrides: https://www.wowhead.com/forever/spell=14748 and spell=11189
-local shieldTalents = {
-    [14748] = {node = 105846, definition = 135376, 7, 14, 20}, -- Improved Power Word: Shield
-    [11189] = {node = 105780, definition = 135310, 10, 20},    -- Frost Warding
+-- Percentages are the Forever trait overrides for each talent spell ID.
+local amountTalents = {
+    [14748] = {class = "PRIEST", node = 105846, definition = 135376, 7, 14, 20},     -- Improved Power Word: Shield
+    [11189] = {class = "MAGE", node = 105780, definition = 135310, 10, 20},           -- Frost Warding
+    [14908] = {class = "PRIEST", node = 105866, definition = 135396, 5, 10, 15},     -- Improved Renew
+    [1225132] = {class = "PRIEST", node = 105849, definition = 135379, 1, 2, 3, 4, 5}, -- Twin Disciplines
+    [14898] = {class = "PRIEST", node = 105852, definition = 135382, 3, 7, 10},       -- Spiritual Healing
 }
 
-function ns.ClearShieldTalentRanks()
-    for _, talent in pairs(shieldTalents) do talent.config, talent.percent = nil, nil end
+-- Once the bars subscribe to talent changes, all visible spells can reuse
+-- the same confirmed multipliers. Standalone estimates still read live ranks.
+local talentFactors
+local captureTalents = true
+function ns.DirtyTalentRanks()
+    talentFactors = {}
+    captureTalents = true
+end
+
+function ns.ClearTalentRanks()
+    for _, talent in pairs(amountTalents) do talent.config, talent.percent = nil, nil end
+    if talentFactors then talentFactors = {} end
+    captureTalents = true
 end
 
 local function nativeID(getID, ...)
@@ -132,8 +146,9 @@ local function committedPercent(config, talent)
     end
 end
 
-local function shieldMultiplier(id)
-    local talent = shieldTalents[id]
+local function talentMultiplier(id)
+    if talentFactors and talentFactors[id] then return talentFactors[id] end
+    local talent = amountTalents[id]
     if not talent then return 1 end
     local config = activeConfig()
     if config then
@@ -142,7 +157,9 @@ local function shieldMultiplier(id)
             local read, percent = pcall(committedPercent, config, talent)
             if read and percent then
                 if not InCombatLockdown() then talent.percent = percent end
-                return 1 + percent / 100
+                local factor = 1 + percent / 100
+                if talentFactors then talentFactors[id] = factor end
+                return factor
             end
         end
     end
@@ -159,12 +176,15 @@ function ns.RefreshPlayerStats()
     rangedPower()
     playerSpirit()
     maxHealth()
+    maxManaForPower()
     talentKnown(1328621) -- Bloom adds a Spirit-based component to druid heals.
-    if UnitClass then
+    if captureTalents and UnitClass then
         local _, class = UnitClass("player")
-        if values.Readable(class) then
-            if class == "PRIEST" then shieldMultiplier(14748)
-            elseif class == "MAGE" then shieldMultiplier(11189) end
+        if values.Readable(class) and type(class) == "string" then
+            captureTalents = false
+            for id, talent in pairs(amountTalents) do
+                if talent.class == class then talentMultiplier(id) end
+            end
         end
     end
 end
@@ -218,6 +238,11 @@ local function magnitude(rank, effect, kind, level, share)
         if not coefficientShare then return end
         local power = spellPower(rank, effect, kind)
         if not power then return end
+        if effect.manaPower then
+            local maximum = maxManaForPower()
+            if not maximum then return end
+            power = power + maximum * effect.manaPower
+        end
         amount = amount + power * effect.sp * coefficientShare
     end
     if effect.ap and effect.ap ~= 0 then
@@ -230,7 +255,10 @@ local function magnitude(rank, effect, kind, level, share)
         if not power then return end
         amount = amount + power * effect.rap
     end
-    if kind == "absorb" and rank.absorbTalent then amount = amount * shieldMultiplier(rank.absorbTalent) end
+    if kind == "absorb" and rank.absorbTalent then amount = amount * talentMultiplier(rank.absorbTalent) end
+    if kind == "heal" and rank.healTalents then
+        for _, id in ipairs(rank.healTalents) do amount = amount * talentMultiplier(id) end
+    end
     return math.max(0, amount) * (effect.ticks or 1)
 end
 
@@ -241,8 +269,28 @@ local function liveCastSeconds(spellID)
     if values.Number(milliseconds) and milliseconds >= 0 then return milliseconds / 1000 end
 end
 
+local function procChannelSeconds(rank)
+    if not (C_Secrets and C_Secrets.ShouldSpellAuraBeSecret and C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID) then return end
+    local restricted = C_Secrets.ShouldSpellAuraBeSecret(rank.channelAura)
+    if not values.Readable(restricted) or restricted ~= false then return end
+    -- This query also returns nothing when an aura is secret. Only the
+    -- predicate above distinguishes a readable absence from that case.
+    local aura = C_UnitAuras.GetPlayerAuraBySpellID(rank.channelAura)
+    if not values.Readable(aura) then return end
+    if aura == nil then return rank.channel end
+    if type(aura) == "table" and values.Number(aura.spellId) and aura.spellId == rank.channelAura then
+        return rank.channel * 0.5 -- Missile Barrage halves both duration and tick interval.
+    end
+end
+
 local function applicationSeconds(spellID, rank, healing)
+    if healing and rank.triggeredHeal then return end -- delivery depends on a later hit or heal
     local elapsed = rank.channel
+    if rank.channelAura then
+        local ok, duration = pcall(procChannelSeconds, rank)
+        if not ok or not duration then return end
+        elapsed = duration
+    end
     if not elapsed then
         local cast = rank.cast or 0
         if C_Spell.GetSpellInfo then

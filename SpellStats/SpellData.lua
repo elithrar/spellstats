@@ -2,7 +2,7 @@
 -- https://github.com/wowsims/gamedata/tree/0c2b3f0dff123ea052afd3dbef43c1490907d419/spells
 -- Learn levels and per-level caps from SpellPowerCoefficients 1.0.2 (70888/70862):
 -- https://www.curseforge.com/wow/addons/spc-forever/files/9739224
--- Hunter RAP shares (15% Arcane Shot; 25% over 5 Serpent Sting ticks) and mage rank levels:
+-- Hunter RAP shares (15% Arcane Shot; 25% over 5 Serpent Sting ticks) and supplemental trainer levels:
 -- https://www.curseforge.com/wow/addons/dynamictooltips/files/9705865
 -- Shadow Ward rank values missing from the primary export: https://foreverdb.net/spell/6229 (71037).
 -- Effect and timing: https://db.icy-veins.com/wow-forever/spells/6229 (and the other rank IDs).
@@ -21,14 +21,14 @@ ns.SpellData = {
     [8439] = {kind="damage", school=7, level=38, cast=0, gcd=1.5, components={{low=129.4138, high=140.5862, sp=0.143, perLevel=0.9, baseLevel=38, maxLevel=43}}}, -- Arcane Explosion 4
     [10201] = {kind="damage", school=7, level=46, cast=0, gcd=1.5, components={{low=175.4536, high=190.5464, sp=0.143, perLevel=1.1, baseLevel=46, maxLevel=51}}}, -- Arcane Explosion 5
     [10202] = {kind="damage", school=7, level=54, cast=0, gcd=1.5, components={{low=232.4348, high=251.5652, sp=0.143, perLevel=1.3, baseLevel=54, maxLevel=59}}}, -- Arcane Explosion 6
-    [5143] = {kind="damage", school=7, level=8, cast=0, gcd=1.5, channel=3, components={{low=24, high=24, ticks=3, sp=0.286, perLevel=0.2, baseLevel=8, maxLevel=12}}}, -- Arcane Missiles 1
-    [5144] = {kind="damage", school=7, level=16, cast=0, gcd=1.5, channel=4, components={{low=34, high=34, ticks=4, sp=0.286, perLevel=0.3, baseLevel=16, maxLevel=20}}}, -- Arcane Missiles 2
-    [5145] = {kind="damage", school=7, level=24, cast=0, gcd=1.5, channel=5, components={{low=47, high=47, ticks=5, sp=0.286, perLevel=0.4, baseLevel=24, maxLevel=28}}}, -- Arcane Missiles 3
-    [8416] = {kind="damage", school=7, level=32, cast=0, gcd=1.5, channel=5, components={{low=66, high=66, ticks=5, sp=0.286, perLevel=0.6, baseLevel=32, maxLevel=36}}}, -- Arcane Missiles 4
-    [8417] = {kind="damage", school=7, level=40, cast=0, gcd=1.5, channel=5, components={{low=95, high=95, ticks=5, sp=0.286, perLevel=0.7, baseLevel=40, maxLevel=44}}}, -- Arcane Missiles 5
-    [10211] = {kind="damage", school=7, level=48, cast=0, gcd=1.5, channel=5, components={{low=130, high=130, ticks=5, sp=0.286, perLevel=0.8, baseLevel=48, maxLevel=52}}}, -- Arcane Missiles 6
-    [10212] = {kind="damage", school=7, level=56, cast=0, gcd=1.5, channel=5, components={{low=171, high=171, ticks=5, sp=0.286, perLevel=0.9, baseLevel=56, maxLevel=60}}}, -- Arcane Missiles 7
-    [25345] = {kind="damage", school=7, level=56, cast=0, gcd=1.5, channel=5, components={{low=209, high=209, ticks=5, sp=0.286, perLevel=1, baseLevel=56, maxLevel=56}}}, -- Arcane Missiles 8
+    [5143] = {kind="damage", school=7, level=8, channelAura=400589, cast=0, gcd=1.5, channel=3, components={{low=24, high=24, ticks=3, sp=0.286, perLevel=0.2, baseLevel=8, maxLevel=12}}}, -- Arcane Missiles 1
+    [5144] = {kind="damage", school=7, level=16, channelAura=400589, cast=0, gcd=1.5, channel=4, components={{low=34, high=34, ticks=4, sp=0.286, perLevel=0.3, baseLevel=16, maxLevel=20}}}, -- Arcane Missiles 2
+    [5145] = {kind="damage", school=7, level=24, channelAura=400589, cast=0, gcd=1.5, channel=5, components={{low=47, high=47, ticks=5, sp=0.286, perLevel=0.4, baseLevel=24, maxLevel=28}}}, -- Arcane Missiles 3
+    [8416] = {kind="damage", school=7, level=32, channelAura=400589, cast=0, gcd=1.5, channel=5, components={{low=66, high=66, ticks=5, sp=0.286, perLevel=0.6, baseLevel=32, maxLevel=36}}}, -- Arcane Missiles 4
+    [8417] = {kind="damage", school=7, level=40, channelAura=400589, cast=0, gcd=1.5, channel=5, components={{low=95, high=95, ticks=5, sp=0.286, perLevel=0.7, baseLevel=40, maxLevel=44}}}, -- Arcane Missiles 5
+    [10211] = {kind="damage", school=7, level=48, channelAura=400589, cast=0, gcd=1.5, channel=5, components={{low=130, high=130, ticks=5, sp=0.286, perLevel=0.8, baseLevel=48, maxLevel=52}}}, -- Arcane Missiles 6
+    [10212] = {kind="damage", school=7, level=56, channelAura=400589, cast=0, gcd=1.5, channel=5, components={{low=171, high=171, ticks=5, sp=0.286, perLevel=0.9, baseLevel=56, maxLevel=60}}}, -- Arcane Missiles 7
+    [25345] = {kind="damage", school=7, level=56, channelAura=400589, cast=0, gcd=1.5, channel=5, components={{low=209, high=209, ticks=5, sp=0.286, perLevel=1, baseLevel=56, maxLevel=56}}}, -- Arcane Missiles 8
     [3044] = {kind="damage", school=7, cast=0, gcd=1.5, components={{low=25, high=25, rap=0.15}}}, -- Arcane Shot 1
     [14281] = {kind="damage", school=7, cast=0, gcd=1.5, components={{low=35, high=35, rap=0.15}}}, -- Arcane Shot 2
     [14282] = {kind="damage", school=7, cast=0, gcd=1.5, components={{low=50, high=50, rap=0.15}}}, -- Arcane Shot 3
@@ -37,6 +37,10 @@ ns.SpellData = {
     [14285] = {kind="damage", school=7, cast=0, gcd=1.5, components={{low=175, high=175, rap=0.15}}}, -- Arcane Shot 6
     [14286] = {kind="damage", school=7, cast=0, gcd=1.5, components={{low=220, high=220, rap=0.15}}}, -- Arcane Shot 7
     [14287] = {kind="damage", school=7, cast=0, gcd=1.5, components={{low=280, high=280, rap=0.15}}}, -- Arcane Shot 8
+    [1326079] = {kind="damage", school=7, level=25, cast=3.5, gcd=1.5, components={{low=107.9397, high=132.0603, sp=1, perLevel=1.4, baseLevel=25, maxLevel=35, manaPower=0.05}}}, -- Arcane Wrath 1
+    [1326080] = {kind="damage", school=7, level=36, cast=3.5, gcd=1.5, components={{low=168.206, high=205.794, sp=1, perLevel=2.3, baseLevel=36, maxLevel=47, manaPower=0.05}}}, -- Arcane Wrath 2
+    [1326081] = {kind="damage", school=7, level=48, cast=3.5, gcd=1.5, components={{low=269.8492, high=330.1508, sp=1, perLevel=2.4, baseLevel=48, maxLevel=59, manaPower=0.05}}}, -- Arcane Wrath 3
+    [1326082] = {kind="damage", school=7, level=60, cast=3.5, gcd=1.5, components={{low=405.6734, high=496.3266, sp=1, perLevel=3, baseLevel=60, maxLevel=71, manaPower=0.05}}}, -- Arcane Wrath 4
     [980] = {kind="damage", school=6, level=8, cast=0, gcd=1.5, damageDuration=24, components={{low=6, high=6, ticks=12, sp=0.133}}}, -- Bane of Agony 1
     [1014] = {kind="damage", school=6, level=18, cast=0, gcd=1.5, damageDuration=24, components={{low=10, high=10, ticks=12, sp=0.133}}}, -- Bane of Agony 2
     [6217] = {kind="damage", school=6, level=28, cast=0, gcd=1.5, damageDuration=24, components={{low=14, high=14, ticks=12, sp=0.133}}}, -- Bane of Agony 3
@@ -84,6 +88,17 @@ ns.SpellData = {
     [10159] = {kind="damage", school=5, level=42, cast=0, gcd=1.5, components={{low=194.4225, high=213.5775, sp=0.129, perLevel=1.2, baseLevel=42, maxLevel=47}}}, -- Cone of Cold 3
     [10160] = {kind="damage", school=5, level=50, cast=0, gcd=1.5, components={{low=254.4693, high=279.5307, sp=0.129, perLevel=1.3, baseLevel=50, maxLevel=55}}}, -- Cone of Cold 4
     [10161] = {kind="damage", school=5, level=58, cast=0, gcd=1.5, components={{low=325.4286, high=354.5714, sp=0.129, perLevel=1.5, baseLevel=58, maxLevel=63}}}, -- Cone of Cold 5
+    [17962] = {kind="damage", school=3, level=40, cast=0, gcd=1.5, components={{low=128.3516, high=163.6484, sp=0.429, perLevel=1, baseLevel=40, maxLevel=46}}}, -- Conflagrate 3
+    [18930] = {kind="damage", school=3, level=48, cast=0, gcd=1.5, components={{low=172.2022, high=215.7978, sp=0.429, perLevel=1.1, baseLevel=48, maxLevel=54}}}, -- Conflagrate 4
+    [18931] = {kind="damage", school=3, level=54, cast=0, gcd=1.5, components={{low=212.3828, high=265.6172, sp=0.429, perLevel=1.2, baseLevel=54, maxLevel=60}}}, -- Conflagrate 5
+    [18932] = {kind="damage", school=3, level=60, cast=0, gcd=1.5, components={{low=251.1036, high=312.8964, sp=0.429, perLevel=1.3, baseLevel=60, maxLevel=66}}}, -- Conflagrate 6
+    [1293817] = {kind="damage", school=3, level=25, cast=0, gcd=1.5, components={{low=83.51648, high=106.4835, sp=0.429, perLevel=0.9, baseLevel=25, maxLevel=30}}}, -- Conflagrate 1
+    [1293818] = {kind="damage", school=3, level=32, cast=0, gcd=1.5, components={{low=107.2527, high=136.7473, sp=0.429, perLevel=0.9, baseLevel=32, maxLevel=38}}}, -- Conflagrate 2
+    [20116] = {kind="damage", school=2, level=30, cast=0, gcd=1.5, damageDuration=8, components={{low=3, high=3, ticks=8}, {low=7, high=7, ticks=8, sp=0.042}}}, -- Consecration 2
+    [20922] = {kind="damage", school=2, level=40, cast=0, gcd=1.5, damageDuration=8, components={{low=6, high=6, ticks=8}, {low=11, high=11, ticks=8, sp=0.042}}}, -- Consecration 3
+    [20923] = {kind="damage", school=2, level=50, cast=0, gcd=1.5, damageDuration=8, components={{low=8, high=8, ticks=8}, {low=20, high=20, ticks=8, sp=0.042}}}, -- Consecration 4
+    [20924] = {kind="damage", school=2, level=60, cast=0, gcd=1.5, damageDuration=8, components={{low=12, high=12, ticks=8}, {low=27, high=27, ticks=8, sp=0.042}}}, -- Consecration 5
+    [26573] = {kind="damage", school=2, level=20, cast=0, gcd=1.5, damageDuration=8, components={{low=2, high=2, ticks=8}, {low=4, high=4, ticks=8, sp=0.042}}}, -- Consecration 1
     [172] = {kind="damage", school=6, level=4, cast=2, gcd=1.5, damageDuration=12, components={{low=10, high=10, ticks=4, sp=0.2}}}, -- Corruption 1
     [6222] = {kind="damage", school=6, level=14, cast=2, gcd=1.5, damageDuration=15, components={{low=13, high=13, ticks=5, sp=0.2}}}, -- Corruption 2
     [6223] = {kind="damage", school=6, level=24, cast=2, gcd=1.5, damageDuration=18, components={{low=22, high=22, ticks=6, sp=0.2}}}, -- Corruption 3
@@ -288,6 +303,13 @@ ns.SpellData = {
     [10395] = {kind="heal", school=4, level=48, cast=3, gcd=1.5, components={{low=905.2418, high=1038.758, sp=0.857, perLevel=4.7, baseLevel=48, maxLevel=53}}}, -- Healing Wave 8
     [10396] = {kind="heal", school=4, level=56, cast=3, gcd=1.5, components={{low=1254.951, high=1433.049, sp=0.857, perLevel=5.5, baseLevel=56, maxLevel=61}}}, -- Healing Wave 9
     [25357] = {kind="heal", school=4, level=60, cast=3, gcd=1.5, components={{low=1507.954, high=1722.046, sp=0.857, perLevel=5.5, baseLevel=60, maxLevel=65}}}, -- Healing Wave 10
+    [755] = {kind="heal", school=6, level=12, cast=0, gcd=1.5, channel=10, components={{low=12, high=12, ticks=10}}}, -- Health Funnel 1
+    [3698] = {kind="heal", school=6, level=20, cast=0, gcd=1.5, channel=10, components={{low=24, high=24, ticks=10}}}, -- Health Funnel 2
+    [3699] = {kind="heal", school=6, level=28, cast=0, gcd=1.5, channel=10, components={{low=43, high=43, ticks=10}}}, -- Health Funnel 3
+    [3700] = {kind="heal", school=6, level=36, cast=0, gcd=1.5, channel=10, components={{low=64, high=64, ticks=10}}}, -- Health Funnel 4
+    [11693] = {kind="heal", school=6, level=44, cast=0, gcd=1.5, channel=10, components={{low=89, high=89, ticks=10}}}, -- Health Funnel 5
+    [11694] = {kind="heal", school=6, level=52, cast=0, gcd=1.5, channel=10, components={{low=119, high=119, ticks=10}}}, -- Health Funnel 6
+    [11695] = {kind="heal", school=6, level=60, cast=0, gcd=1.5, channel=10, components={{low=153, high=153, ticks=10}}}, -- Health Funnel 7
     [14914] = {kind="damage", school=2, level=20, cast=3.5, gcd=1.5, damageDuration=10, components={{low=47.86364, high=60.13636, sp=0.75, perLevel=1.3, baseLevel=20, maxLevel=24}, {low=4, high=4, ticks=5, sp=0.05}}}, -- Holy Fire 1
     [15261] = {kind="damage", school=2, level=60, cast=3.5, gcd=1.5, damageDuration=10, components={{low=183.6816, high=232.3184, sp=0.75, perLevel=2, baseLevel=60, maxLevel=66}, {low=15, high=15, ticks=5, sp=0.05}}}, -- Holy Fire 8
     [15262] = {kind="damage", school=2, level=24, cast=3.5, gcd=1.5, damageDuration=10, components={{low=56, high=70, sp=0.75, perLevel=1.4, baseLevel=24, maxLevel=30}, {low=5, high=5, ticks=5, sp=0.05}}}, -- Holy Fire 2
@@ -440,6 +462,9 @@ ns.SpellData = {
     [10960] = {kind="heal", school=2, level=50, cast=3, gcd=1.5, components={{low=389.7293, high=412.2707, sp=0.286, perLevel=1.3, baseLevel=50, maxLevel=59}}}, -- Prayer of Healing 3
     [10961] = {kind="heal", school=2, level=60, cast=3, gcd=1.5, components={{low=567.2922, high=598.7078, sp=0.286, perLevel=1.5, baseLevel=60, maxLevel=69}}}, -- Prayer of Healing 4
     [25316] = {kind="heal", school=2, level=60, cast=3, gcd=1.5, components={{low=631.4103, high=666.5897, sp=0.286, perLevel=1.6, baseLevel=60, maxLevel=69}}}, -- Prayer of Healing 5
+    [401859] = {kind="heal", school=2, level=40, triggeredHeal=true, healTalents={1225132, 14898}, cast=0, gcd=1.5, components={{low=172, high=172, sp=0.429}}}, -- Prayer of Mending 1
+    [1240826] = {kind="heal", school=2, level=50, triggeredHeal=true, healTalents={1225132, 14898}, cast=0, gcd=1.5, components={{low=298, high=298, sp=0.429}}}, -- Prayer of Mending 2
+    [1240827] = {kind="heal", school=2, level=60, triggeredHeal=true, healTalents={1225132, 14898}, cast=0, gcd=1.5, components={{low=413, high=413, sp=0.429}}}, -- Prayer of Mending 3
     [11366] = {kind="damage", school=3, level=20, cast=6, gcd=1.5, damageDuration=12, components={{low=94.57317, high=125.4268, sp=1, perLevel=1.5, baseLevel=20, maxLevel=24}, {low=11, high=11, ticks=4, sp=0.15}}}, -- Pyroblast 1
     [12505] = {kind="damage", school=3, level=24, cast=6, gcd=1.5, damageDuration=12, components={{low=115.9615, high=152.0385, sp=1, perLevel=1.7, baseLevel=24, maxLevel=30}, {low=14, high=14, ticks=4, sp=0.15}}}, -- Pyroblast 2
     [12522] = {kind="damage", school=3, level=30, cast=6, gcd=1.5, damageDuration=12, components={{low=167.3711, high=214.6289, sp=1, perLevel=2.1, baseLevel=30, maxLevel=36}, {low=19, high=19, ticks=4, sp=0.15}}}, -- Pyroblast 3
@@ -474,26 +499,26 @@ ns.SpellData = {
     [9840] = {kind="heal", school=4, level=52, cast=0, gcd=1.5, healDuration=12, components={{low=124, high=124, ticks=4, sp=0.2}, {low=0, high=0, spirit=1, talent=1328621}}}, -- Rejuvenation 9
     [9841] = {kind="heal", school=4, level=58, cast=0, gcd=1.5, healDuration=12, components={{low=161, high=161, ticks=4, sp=0.2}, {low=0, high=0, spirit=1, talent=1328621}}}, -- Rejuvenation 10
     [25299] = {kind="heal", school=4, level=60, cast=0, gcd=1.5, healDuration=12, components={{low=194, high=194, ticks=4, sp=0.2}, {low=0, high=0, spirit=1, talent=1328621}}}, -- Rejuvenation 11
-    [139] = {kind="heal", school=2, level=8, cast=0, gcd=1.5, healDuration=15, components={{low=9, high=9, ticks=5, sp=0.2}}}, -- Renew 1
-    [6074] = {kind="heal", school=2, level=14, cast=0, gcd=1.5, healDuration=15, components={{low=15, high=15, ticks=5, sp=0.2}}}, -- Renew 2
-    [6075] = {kind="heal", school=2, level=20, cast=0, gcd=1.5, healDuration=15, components={{low=25, high=25, ticks=5, sp=0.2}}}, -- Renew 3
-    [6076] = {kind="heal", school=2, level=26, cast=0, gcd=1.5, healDuration=15, components={{low=32, high=32, ticks=5, sp=0.2}}}, -- Renew 4
-    [6077] = {kind="heal", school=2, level=32, cast=0, gcd=1.5, healDuration=15, components={{low=41, high=41, ticks=5, sp=0.2}}}, -- Renew 5
-    [6078] = {kind="heal", school=2, level=38, cast=0, gcd=1.5, healDuration=15, components={{low=54, high=54, ticks=5, sp=0.2}}}, -- Renew 6
-    [10927] = {kind="heal", school=2, level=44, cast=0, gcd=1.5, healDuration=15, components={{low=74, high=74, ticks=5, sp=0.2}}}, -- Renew 7
-    [10928] = {kind="heal", school=2, level=50, cast=0, gcd=1.5, healDuration=15, components={{low=102, high=102, ticks=5, sp=0.2}}}, -- Renew 8
-    [10929] = {kind="heal", school=2, level=56, cast=0, gcd=1.5, healDuration=15, components={{low=134, high=134, ticks=5, sp=0.2}}}, -- Renew 9
-    [25315] = {kind="heal", school=2, level=60, cast=0, gcd=1.5, healDuration=15, components={{low=166, high=166, ticks=5, sp=0.2}}}, -- Renew 10
-    [425268] = {kind="heal", school=2, level=8, cast=0, gcd=1.5, healDuration=15, components={{low=9, high=9, ticks=5, sp=0.1265}}}, -- Renew 1
-    [425269] = {kind="heal", school=2, level=14, cast=0, gcd=1.5, healDuration=15, components={{low=20, high=20, ticks=5, sp=0.17825}}}, -- Renew 2
-    [425270] = {kind="heal", school=2, level=20, cast=0, gcd=1.5, healDuration=15, components={{low=35, high=35, ticks=5, sp=0.23}}}, -- Renew 3
-    [425271] = {kind="heal", school=2, level=26, cast=0, gcd=1.5, healDuration=15, components={{low=49, high=49, ticks=5, sp=0.23}}}, -- Renew 4
-    [425272] = {kind="heal", school=2, level=32, cast=0, gcd=1.5, healDuration=15, components={{low=63, high=63, ticks=5, sp=0.23}}}, -- Renew 5
-    [425273] = {kind="heal", school=2, level=38, cast=0, gcd=1.5, healDuration=15, components={{low=80, high=80, ticks=5, sp=0.23}}}, -- Renew 6
-    [425274] = {kind="heal", school=2, level=44, cast=0, gcd=1.5, healDuration=15, components={{low=102, high=102, ticks=5, sp=0.23}}}, -- Renew 7
-    [425275] = {kind="heal", school=2, level=50, cast=0, gcd=1.5, healDuration=15, components={{low=130, high=130, ticks=5, sp=0.23}}}, -- Renew 8
-    [425276] = {kind="heal", school=2, level=56, cast=0, gcd=1.5, healDuration=15, components={{low=162, high=162, ticks=5, sp=0.23}}}, -- Renew 9
-    [425277] = {kind="heal", school=2, level=60, cast=0, gcd=1.5, healDuration=15, components={{low=194, high=194, ticks=5, sp=0.23}}}, -- Renew 10
+    [139] = {kind="heal", school=2, level=8, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=9, high=9, ticks=5, sp=0.2}}}, -- Renew 1
+    [6074] = {kind="heal", school=2, level=14, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=15, high=15, ticks=5, sp=0.2}}}, -- Renew 2
+    [6075] = {kind="heal", school=2, level=20, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=25, high=25, ticks=5, sp=0.2}}}, -- Renew 3
+    [6076] = {kind="heal", school=2, level=26, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=32, high=32, ticks=5, sp=0.2}}}, -- Renew 4
+    [6077] = {kind="heal", school=2, level=32, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=41, high=41, ticks=5, sp=0.2}}}, -- Renew 5
+    [6078] = {kind="heal", school=2, level=38, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=54, high=54, ticks=5, sp=0.2}}}, -- Renew 6
+    [10927] = {kind="heal", school=2, level=44, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=74, high=74, ticks=5, sp=0.2}}}, -- Renew 7
+    [10928] = {kind="heal", school=2, level=50, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=102, high=102, ticks=5, sp=0.2}}}, -- Renew 8
+    [10929] = {kind="heal", school=2, level=56, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=134, high=134, ticks=5, sp=0.2}}}, -- Renew 9
+    [25315] = {kind="heal", school=2, level=60, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=166, high=166, ticks=5, sp=0.2}}}, -- Renew 10
+    [425268] = {kind="heal", school=2, level=8, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=9, high=9, ticks=5, sp=0.1265}}}, -- Renew 1
+    [425269] = {kind="heal", school=2, level=14, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=20, high=20, ticks=5, sp=0.17825}}}, -- Renew 2
+    [425270] = {kind="heal", school=2, level=20, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=35, high=35, ticks=5, sp=0.23}}}, -- Renew 3
+    [425271] = {kind="heal", school=2, level=26, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=49, high=49, ticks=5, sp=0.23}}}, -- Renew 4
+    [425272] = {kind="heal", school=2, level=32, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=63, high=63, ticks=5, sp=0.23}}}, -- Renew 5
+    [425273] = {kind="heal", school=2, level=38, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=80, high=80, ticks=5, sp=0.23}}}, -- Renew 6
+    [425274] = {kind="heal", school=2, level=44, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=102, high=102, ticks=5, sp=0.23}}}, -- Renew 7
+    [425275] = {kind="heal", school=2, level=50, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=130, high=130, ticks=5, sp=0.23}}}, -- Renew 8
+    [425276] = {kind="heal", school=2, level=56, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=162, high=162, ticks=5, sp=0.23}}}, -- Renew 9
+    [425277] = {kind="heal", school=2, level=60, healTalents={14908, 1225132, 14898}, cast=0, gcd=1.5, healDuration=15, components={{low=194, high=194, ticks=5, sp=0.23}}}, -- Renew 10
     [408521] = {kind="heal", school=4, level=40, cast=0, gcd=1.5, healDuration=15, components={{low=89, high=89, ticks=5, sp=0.1}}}, -- Riptide 1
     [1239242] = {kind="heal", school=4, level=50, cast=0, gcd=1.5, healDuration=15, components={{low=115, high=115, ticks=5, sp=0.1}}}, -- Riptide 2
     [1239243] = {kind="heal", school=4, level=60, cast=0, gcd=1.5, healDuration=15, components={{low=161, high=161, ticks=5, sp=0.1, perLevel=3.7, baseLevel=60, maxLevel=68}}}, -- Riptide 3

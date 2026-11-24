@@ -97,7 +97,7 @@ function GetSpellBonusDamage(school)
     return damage
 end
 local function near(actual, expected)
-    assert(math.abs(actual - expected) < 0.001, tostring(actual) .. " vs " .. expected)
+    assert(type(actual) == "number" and math.abs(actual - expected) < 0.001, tostring(actual) .. " vs " .. expected)
 end
 near(ns.Estimate(25299).heal, 856) -- Rejuvenation XI, 4 x (194 + .2 * 100)
 near(ns.Estimate(774).heal, 40) -- first rank at level 60 retains 10% of its coefficient
@@ -146,14 +146,18 @@ level, healing, damage, health = 60, 100, 200, 2000
 
 -- A single passive spell ID is shared by multiple ranks. Only a matching
 -- active definition in the committed config identifies the damage bonus.
-local config, staged, ranks = 31, false, {[105846] = 0, [105780] = 0}
-local definitions = {[130575] = 135376, [130509] = 135310}
+local config, staged, ranks, nodeReads = 31, false, {}, 0
+local entries = {[105846] = 130575, [105780] = 130509, [105866] = 130595,
+    [105849] = 130578, [105852] = 130581}
+local definitions = {[130575] = 135376, [130509] = 135310, [130595] = 135396,
+    [130578] = 135379, [130581] = 135382}
 C_ClassTalents = {GetActiveConfigID = function() return config end}
 C_Traits = {
     ConfigHasStagedChanges = function(id) assert(id == config); return staged end,
     GetNodeInfo = function(id, node)
-        assert(id == config and ranks[node] ~= nil)
-        return {activeRank = ranks[node], activeEntry = {entryID = node == 105846 and 130575 or 130509}}
+        assert(id == config and entries[node])
+        nodeReads = nodeReads + 1
+        return {activeRank = ranks[node] or 0, activeEntry = {entryID = entries[node]}}
     end,
     GetEntryInfo = function(id, entry) assert(id == config); return {definitionID = definitions[entry]} end,
 }
@@ -180,7 +184,7 @@ inCombat, ranks[105846] = true, secret
 near(ns.Estimate(10901).heal, 938 * 1.14) -- restricted rank with a confirmed config
 config = secret
 near(ns.Estimate(10901).heal, 938 * 1.14) -- same combat, even the config ID is restricted
-ns.ClearShieldTalentRanks() -- active group/config changed while its new ID is unreadable
+ns.ClearTalentRanks() -- active group/config changed while its new ID is unreadable
 near(ns.Estimate(10901).heal, 938)
 inCombat, config, ranks[105846] = false, 31, 0
 near(ns.Estimate(10901).heal, 938)
@@ -193,6 +197,66 @@ ranks[105846] = 1
 near(ns.Estimate(10901).heal, 938 * 1.07) -- Forever's alternate active group API
 C_ClassTalents = {GetActiveConfigID = function() return nil end}
 near(ns.Estimate(10901).heal, 938 * 1.07)
+
+local renews = {139, 6074, 6075, 6076, 6077, 6078, 10927, 10928, 10929, 25315,
+    425268, 425269, 425270, 425271, 425272, 425273, 425274, 425275, 425276, 425277}
+local untalented = {}
+for _, id in ipairs(renews) do untalented[id] = ns.Estimate(id).heal end
+near(untalented[25315], 5 * (166 + .2 * healing))
+near(untalented[425277], 5 * (194 + .23 * healing))
+for rank, factor in ipairs({1.05, 1.10, 1.15}) do
+    ranks[105866] = rank
+    for _, id in ipairs(renews) do
+        local renewed = ns.Estimate(id, true)
+        near(renewed.heal, untalented[id] * factor)
+        assert(renewed.seconds == 15)
+    end
+    near(ns.Estimate(25299).heal, 856) -- Improved Renew is specific to Renew
+end
+staged, ranks[105866] = true, 0
+near(ns.Estimate(25315).heal, 930 * 1.15)
+staged = false
+near(ns.Estimate(25315).heal, 930)
+
+-- Each Prayer of Mending tooltip multiplies the whole charge by both
+-- passives. Neither the five charges nor the 30 s buff is a per-target rate.
+for twin = 0, 5 do
+    ranks[105849] = twin
+    for rank, spiritual in ipairs({0, 3, 7, 10}) do
+        ranks[105852] = rank - 1
+        local factor = (1 + twin / 100) * (1 + spiritual / 100)
+        local prayer = ns.Estimate(1240827, true)
+        near(prayer.heal, 455.9 * factor)
+        assert(prayer.isHeal and prayer.seconds == nil)
+        near(ns.Estimate(25315).heal, 930 * factor)
+    end
+end
+-- At full ranks, Improved Renew multiplies both periodic bonuses on Renew.
+-- Prayer of Mending still uses only Twin Disciplines and Spiritual Healing.
+ranks[105866] = 3
+for _, id in ipairs(renews) do near(ns.Estimate(id).heal, untalented[id] * 1.32825) end
+costs = {{type = 0, cost = 410}}
+local fullRenew = ns.Estimate(25315, true)
+near(fullRenew.heal / fullRenew.seconds, 82.3515)
+near(fullRenew.heal / fullRenew.cost, 3.01286)
+near(ns.Estimate(1240827).heal, 455.9 * 1.05 * 1.10)
+ranks[105866], ranks[105849], ranks[105852] = 0, 0, 0
+-- The event-driven bars share committed talent reads across visible ranks.
+-- A respec can invalidate these reads independently of an ordinary stat update.
+function UnitClass() return "Priest", "PRIEST" end
+ranks[105866] = 2
+ns.DirtyTalentRanks()
+ns.RefreshPlayerStats()
+local sampled = nodeReads
+ns.RefreshPlayerStats()
+near(ns.Estimate(25315).heal, 930 * 1.10)
+near(ns.Estimate(425277).heal, 1085 * 1.10)
+assert(nodeReads == sampled)
+ranks[105866] = 0
+ns.DirtyTalentRanks()
+near(ns.Estimate(25315).heal, 930)
+assert(nodeReads > sampled)
+UnitClass = nil
 C_ClassTalents, C_SpecializationInfo, C_Traits = nil, nil, nil
 
 bloomKnown = true
@@ -216,6 +280,59 @@ near(ns.Estimate(6789).heal, 328)
 healing = 100
 local hands = ns.Estimate(633)
 assert(hands.heal == 2000 and hands.cost == 900)
+
+-- Build 71037 cast records at their learned level. The listed damage is
+-- for one target: one Conflagrate hit and both of Consecration's eight-tick
+-- effects on the first enemy. The four-target cap adds no extra hits here.
+local ordinaryDamage = GetSpellBonusDamage
+function GetSpellBonusDamage(school) return school * 50 end
+for _, family in ipairs({
+    {seconds = 1.5, bonus = .429 * 150, {1293817, 25, 95}, {1293818, 32, 122}, {17962, 40, 146},
+        {18930, 48, 194}, {18931, 54, 239}, {18932, 60, 282}},
+    {seconds = 8, bonus = .336 * 100, {26573, 20, 48}, {20116, 30, 80}, {20922, 40, 136},
+        {20923, 50, 224}, {20924, 60, 312}},
+}) do
+    for _, row in ipairs(family) do
+        level = row[2]
+        local hit = ns.Estimate(row[1], true)
+        near(hit.damage, row[3] + family.bonus)
+        assert(not hit.isHeal and hit.heal == nil and hit.seconds == family.seconds)
+    end
+end
+-- Caster health is the resource spent on Health Funnel. The pet receives
+-- ten fixed heals; the caster's own periodic damage does not enter DPS.
+costs = {{type = -2, cost = 79}}
+for id, total in pairs({[755]=120, [3698]=240, [3699]=430, [3700]=640,
+    [11693]=890, [11694]=1190, [11695]=1530}) do
+    local funnel = ns.Estimate(id, true)
+    assert(funnel.isHeal and funnel.heal == total and funnel.damage == nil)
+    assert(funnel.cost == nil and funnel.seconds == 10)
+end
+for _, row in ipairs({{401859, 40, 172, 210}, {1240826, 50, 298, 305}, {1240827, 60, 413, 390}}) do
+    level, costs = row[2], {{type = 0, cost = row[4]}}
+    local prayer = ns.Estimate(row[1], true)
+    near(prayer.heal, row[3] + .429 * healing)
+    assert(prayer.isHeal and prayer.damage == nil and prayer.seconds == nil and prayer.cost == row[4])
+end
+near(ns.Estimate(401859).heal, 172 + .429 * healing * .85)
+for _, helper in ipairs({401863, 401877, 401880, 1280349}) do
+    local proc = ns.Estimate(helper, true)
+    assert(proc.heal == nil and proc.damage == nil and proc.seconds == nil)
+end
+-- Arcane Wrath's 5% of maximum mana adds spell power before downranking.
+maxMana = 1000
+for _, row in ipairs({{1326079, 25, 120}, {1326080, 36, 187}, {1326081, 48, 300}, {1326082, 60, 451}}) do
+    level = row[2]
+    local wrath = ns.Estimate(row[1], true)
+    near(wrath.damage, row[3] + 350 + 50)
+    assert(not wrath.isHeal and wrath.seconds == 3.5)
+end
+near(ns.Estimate(1326079).damage, 134 + .1 * (350 + 50))
+maxMana = 2000
+near(ns.Estimate(1326082).damage, 451 + 350 + 100)
+near(ns.Estimate(18932).damage, 282 + .429 * 150) -- changing the mana pool only scales Arcane Wrath
+GetSpellBonusDamage = ordinaryDamage
+
 local count = 0
 for id, rank in pairs(ns.SpellData) do
     local estimate = ns.Estimate(id)
@@ -232,10 +349,12 @@ end
 -- belongs to this cast even when its Priest Heal rank 3 magnitude is unknown.
 local fresh = {SomethingNeedDoing = ns.SomethingNeedDoing, SpellData = ns.SpellData}
 assert(loadfile("SpellStats/Model.lua"))("SpellStats", fresh)
-inCombat, level, healing, damage = true, 36, secret, secret
+inCombat, level, healing, damage, maxMana = true, 36, secret, secret, secret
 costs = {{type = 0, cost = 140}}
 local cast = fresh.Estimate(6063)
 assert(cast.isHeal and cast.heal == nil and cast.cost == 140)
+damage = 200
+assert(fresh.Estimate(1326079).damage == nil) -- no readable maximum mana before this combat
 healing, bloomKnown = 100, secret
 assert(fresh.Estimate(3627).heal == nil) -- unknown talent state cannot count as unlearned
 
@@ -249,6 +368,7 @@ costs, maxMana = {{type = 0, cost = 0}}, secret
 cast = fresh.Estimate(6063)
 near(cast.heal, 628.7)
 assert(cast.cost == 0 and fresh.MaxMana() == nil)
+near(fresh.Estimate(1326079).damage, 134 + 200 + 50) -- recalled damage inputs, live mana percentage remains unavailable
 near(fresh.Estimate(116).damage, 40.15) -- downranked Frostbolt with 200 Frost power
 near(fresh.Estimate(3627).heal, 284) -- Rejuvenation 6, with Bloom known to be absent
 costs = {{type = 0, cost = secret}}
@@ -287,6 +407,45 @@ local beforeChannels = castLookups
 near(ns.Estimate(402174, true).seconds, 2) -- Penance's linked channel delivers all three bolts
 near(ns.Estimate(15407, true).seconds, 3) -- Mind Flay's channel includes all three ticks
 assert(castLookups == beforeChannels)
+
+-- Missile Barrage changes the firing interval of the trained channels. The
+-- damage and the live cost can still be read when aura information is blocked.
+local aura, restricted, auraReads = nil, false, 0
+C_Secrets = {ShouldSpellAuraBeSecret = function(id) assert(id == 400589); return restricted end}
+C_UnitAuras = {GetPlayerAuraBySpellID = function(id)
+    assert(id == 400589)
+    auraReads = auraReads + 1
+    return aura
+end}
+costs = {{type = 0, cost = 0}}
+for _, row in ipairs({{5143, 3}, {5144, 4}, {5145, 5}, {8416, 5}, {8417, 5},
+    {10211, 5}, {10212, 5}, {25345, 5}}) do
+    local id, seconds = row[1], row[2]
+    aura = nil
+    local normal = ns.Estimate(id, true)
+    near(normal.seconds, seconds)
+    aura = {spellId = 400589}
+    local barrage = ns.Estimate(id, true)
+    near(barrage.seconds, seconds / 2)
+    near(barrage.damage, normal.damage) -- still delivers all three, four or five missiles
+    assert(barrage.cost == 0)
+end
+local reads = auraReads
+near(ns.Estimate(25345).damage, 5 * (209 + .286 * damage))
+near(ns.Estimate(11695, true).seconds, 10) -- other channels ignore Missile Barrage
+assert(auraReads == reads)
+restricted = true
+local hidden = ns.Estimate(25345, true)
+assert(hidden.seconds == nil and hidden.cost == 0 and hidden.damage ~= nil and auraReads == reads)
+restricted = false
+for _, invalidAura in ipairs({secret, {spellId = secret}, {spellId = 400588}}) do
+    aura = invalidAura
+    assert(ns.Estimate(25345, true).seconds == nil)
+end
+C_UnitAuras.GetPlayerAuraBySpellID = function() error("aura access restricted") end
+assert(ns.Estimate(25345, true).seconds == nil)
+C_UnitAuras, C_Secrets = nil, nil
+assert(ns.Estimate(25345, true).seconds == nil)
 
 -- A hybrid can deliver its healing immediately and its damage over time.
 -- Match the amount renderer's heal-first choice even when healing is zero.

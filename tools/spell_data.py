@@ -18,7 +18,8 @@ def lookup(pattern, text, default=None):
     return m[1] if m else default
 
 
-damage.update("""Wrack|Incinerate|Lava Burst|Ice Lance|Arcane Blast|Chastise|Frostfire Bolt|Chaos Bolt|Arcane Barrage|Mind Spike|Shadow Word: Death|Vampiric Touch|Void Plague|Starsurge|Sunfire|Molten Blast""".split("|"))
+heals.update({"Prayer of Mending", "Health Funnel"})
+damage.update("""Wrack|Incinerate|Lava Burst|Ice Lance|Arcane Blast|Chastise|Frostfire Bolt|Chaos Bolt|Arcane Barrage|Mind Spike|Shadow Word: Death|Vampiric Touch|Void Plague|Starsurge|Sunfire|Molten Blast|Arcane Wrath|Conflagrate|Consecration""".split("|"))
 # Learn levels from the build 70959 trainer data. Advanced Warding's
 # friendly-target replacements occupy the corresponding trained ward ranks.
 ward_levels = {"Fire Ward": (20, 30, 40, 50, 60), "Frost Ward": (22, 32, 42, 52, 60),
@@ -26,6 +27,8 @@ ward_levels = {"Fire Ward": (20, 30, 40, 50, 60), "Frost Ward": (22, 32, 42, 52,
 shields = set(ward_levels) | {"Power Word: Shield", "Ice Barrier", "Templar's Bulwark"}
 levels = {1312002:20, 400640:28, 1240044:34, 1240045:42, 1240046:48, 1240047:56}
 levels.update({11426:40, 13031:46, 13032:52, 13033:58})
+levels.update({401859:40, 1240826:50, 1240827:60})  # Prayer of Mending
+levels.update({755:12, 3698:20, 3699:28, 3700:36, 11693:44, 11694:52, 11695:60})  # Health Funnel
 caps = {}
 for line in (spc / "Data.lua").read_text().splitlines():
     match = re.match(r'  \[(\d+)\] = { n=', line)
@@ -151,6 +154,8 @@ def direct_effects(spell, parent, repeats=1):
         # Binding Heal duplicates the same amount onto the caster.
         if spell.name == "Binding Heal" and "target=[1,0]" in raw:
             continue
+        if spell.name == "Health Funnel" and "target=[1,0]" in raw:
+            continue  # The caster pays health. Only the pet receives the spell's heal.
         if p.get("period"):
             period = p["period"] / 1000
             ticks = (spell.duration or parent.duration) / period
@@ -182,6 +187,10 @@ def direct_effects(spell, parent, repeats=1):
 
 def components(spell):
     name = spell.name
+    if name == "Prayer of Mending":
+        # The cast stores the heal for one target in its first dummy effect.
+        # Jumps can reach other targets only after subsequent qualifying events.
+        return [measure(spell, spell, *spell.effects[0], "heal", 1)]
     if name == "Swiftmend":
         return []  # Depends on which HoT the caster has on this target.
     if name == "Lay on Hands":
@@ -206,11 +215,13 @@ def components(spell):
         out[0]["rap"] = .25 / out[0]["ticks"]
     if out and name == "Molten Blast":
         out[0]["ap"] = spell.effects[1][2]["base"] / 100
+    if out and name == "Arcane Wrath":
+        out[0]["manaPower"] = spell.effects[1][2]["base"] / 100
     # Resolve the effect-ID references from the cast's localized template
     # (record IDs and effect slots are stable across locales).
     hit_ids = re.findall(r'\$(\d+)[smo]1\b', spell.tooltip)
     if name in {"Holy Nova", "Holy Shock", "Penance", "Lightwell", "Blizzard", "Hurricane",
-                "Flamestrike", "Rain of Fire", "Healing Rain", "Healing Stream Totem", "Arcane Missiles"}:
+                "Flamestrike", "Rain of Fire", "Healing Rain", "Healing Stream Totem", "Arcane Missiles", "Consecration"}:
         for hit_id in dict.fromkeys(hit_ids):
             helper = book.get(int(hit_id))
             if not helper:
@@ -218,6 +229,10 @@ def components(spell):
             repeats = {"Penance": 3, "Flamestrike": 4, "Rain of Fire": 4}.get(name, 1)
             if name in {"Blizzard", "Hurricane", "Arcane Missiles", "Healing Rain"}:
                 repeats = spell.duration
+            if name == "Consecration":
+                # A lone enemy receives both the common pulse and the bonus
+                # for the first four enemies. Each repeats on the cast's periodic aura.
+                repeats = spell.duration / (spell.effects[2][2]["period"] / 1000)
             out.extend(direct_effects(helper, spell, repeats))
     return out
 
@@ -269,7 +284,7 @@ print("""-- Numeric spell effects and base timing (seconds) from the Blizzard Fo
 -- https://github.com/wowsims/gamedata/tree/0c2b3f0dff123ea052afd3dbef43c1490907d419/spells
 -- Learn levels and per-level caps from SpellPowerCoefficients 1.0.2 (70888/70862):
 -- https://www.curseforge.com/wow/addons/spc-forever/files/9739224
--- Hunter RAP shares (15% Arcane Shot; 25% over 5 Serpent Sting ticks) and mage rank levels:
+-- Hunter RAP shares (15% Arcane Shot; 25% over 5 Serpent Sting ticks) and supplemental trainer levels:
 -- https://www.curseforge.com/wow/addons/dynamictooltips/files/9705865
 -- Shadow Ward rank values missing from the primary export: https://foreverdb.net/spell/6229 (71037).
 -- Effect and timing: https://db.icy-veins.com/wow-forever/spells/6229 (and the other rank IDs).
@@ -305,6 +320,13 @@ for spell in sorted(book.values(), key=lambda s: (s.name, s.id)):
         record["allMana"] = True
     if spell.name == "Mana Shield":
         record["conditionalMana"] = True
+    if spell.name == "Prayer of Mending":
+        record["triggeredHeal"] = True
+        record["healTalents"] = [1225132, 14898]  # $twinD * $spiritualH in all three cast tooltips
+    if spell.name == "Renew":
+        record["healTalents"] = [14908, 1225132, 14898]  # Improved Renew, Twin Disciplines, Spiritual Healing
+    if spell.name == "Arcane Missiles":
+        record["channelAura"] = 400589  # Missile Barrage shortens the channel and the missile interval
     if spell.name == "Power Word: Shield":
         record["absorbTalent"] = 14748  # Improved Power Word: Shield
     elif "$11189s3" in spell.tooltip and kind == "absorb":

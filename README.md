@@ -27,7 +27,9 @@ Estimates use rank-specific coefficients and assume a noncritical cast on one ta
 
 Power Word: Shield, Ice Barrier, Fire Ward, Frost Ward, Shadow Ward, Mana Shield, and Templar’s Bulwark count as heals. The amount is how much damage a fresh shield can absorb. Power Word: Shield includes bonus healing and your rank of Improved Power Word: Shield when available. An instant shield on the global cooldown uses that cooldown for HPS. Mana Shield shows its upfront mana cost and leaves HPM blank because it spends additional mana as it absorbs damage.
 
-HPS/DPS averages one cast over the time it takes to deliver its healing or damage. It uses the current cast time when available, otherwise the rank’s base cast time. Global cooldowns, channels and periodic effects use their base durations. For example, a Renew that heals 930 over 15 seconds shows 62 HPS. If there is no measurable time window, the row stays blank.
+HPS/DPS averages one cast over the time it takes to deliver its healing or damage. Renew uses all 15 seconds and includes Improved Renew. Both Renew and Prayer of Mending account for Twin Disciplines and Spiritual Healing. Prayer of Mending shows one trigger and leaves HPS blank because the next qualifying hit or heal determines when it triggers. Health Funnel counts healing delivered to your pet.
+
+Rates use the current cast time when available and otherwise use the rank’s base timing. Missile Barrage halves the channel time for Arcane Missiles. If WoW restricts access to the proc, its DPS row stays blank. Arcane Wrath includes the contribution from maximum mana, and Consecration shows all eight pulses on one enemy.
 
 ## License
 

@@ -16,6 +16,7 @@ local totals = {
 }
 local ns = {
     SpellData = {[403] = {allMana = true}},
+    DirtyTalentRanks = function() end,
     GetSettings = function() return settings end,
     RefreshPlayerStats = function()
         assert(not inCombat, "never replace pre-combat player stats in lockdown")
@@ -40,6 +41,10 @@ function GetActionInfo(slot)
     return info[1], info[2], info[3]
 end
 C_Spell = {GetOverrideSpell = function(id) return id == 775 and 774 or id end}
+
+function ActionButton_UpdateRangeIndicator(button, checksRange)
+    if button.HotKey.value == "*" then button.HotKey.shown = checksRange end
+end
 
 local function newButton(slot)
     local owner = {labels = {}}
@@ -92,11 +97,14 @@ local function frame()
 end
 
 local function caption(value, justification, left, bottom, width, height)
-    return {value = value, alpha = 1,
+    return {value = value, alpha = 1, shown = true, rectReads = 0,
         GetText = function(self) return self.value end,
-        IsShown = function() return true end,
+        IsShown = function(self) return self.shown end,
         GetAlpha = function(self) return self.alpha end,
-        GetRect = function() return left, bottom, width, height end,
+        GetRect = function(self)
+            self.rectReads = self.rectReads + 1
+            return left, bottom, width, height
+        end,
         GetJustifyH = function() return justification end,
         GetStringWidth = function(self) return #self.value * 6 end,
     }
@@ -142,6 +150,28 @@ for i, live in ipairs({top, bottom}) do
     assert(line.size == live.size and line.flags == live.flags and line.justify == live.justify)
     for c = 1, 3 do assert(line.color[c] == live.color[c]) end
 end
+local reads = primary.HotKey.rectReads
+events.UPDATE_BINDINGS()
+frame()
+assert(primary.HotKey.rectReads == reads + 1, "both stat lines share one native caption measurement")
+
+primary.HotKey.value = "*"
+ActionButton_UpdateRangeIndicator(primary, false)
+assert(top.y == -2, "hiding the range dot releases its corner")
+ActionButton_UpdateRangeIndicator(primary, true)
+assert(top.y == -14, "showing an unbound key's range dot repositions its stat")
+reads = primary.HotKey.rectReads
+ActionButton_UpdateRangeIndicator(primary, true)
+assert(primary.HotKey.rectReads == reads and not next(timers), "a range color change needs no layout")
+
+-- A gamepad binding replaces the old hotkey. The macro name intersects the
+-- starting position, moving the top row down into the new binding underneath.
+primary.HotKey = caption("K", "RIGHT", 4, 25, 38, 5)
+primary.Name = caption("M", "RIGHT", 4, 34, 38, 8)
+events.GAME_PAD_ACTIVE_CHANGED(true)
+frame()
+assert(top.y == -20, "clear both stacked captions regardless of measurement order")
+primary.Name = nil
 primary.HotKey.alpha = 0
 events.UPDATE_BINDINGS()
 frame()
@@ -461,7 +491,8 @@ C_ClassTalents = {GetActiveConfigID = function() return activeConfig end}
 C_Traits = {
     ConfigHasStagedChanges = function() return false end,
     GetNodeInfo = function(config, node)
-        assert(config == activeConfig and node == 105846)
+        assert(config == activeConfig)
+        if node ~= 105846 then return end
         return {activeRank = shieldRank, activeEntry = {entryID = 130575}}
     end,
     GetEntryInfo = function(config, entry)
@@ -525,4 +556,35 @@ settings.topStat, settings.bottomStat = "manaCost", "perMana"
 ns.RefreshBars()
 frame()
 assert(eabLines[1].value == "40" and eabLines[2].value == "")
+
+-- Page the native and replacement bars together. Prayer of Mending heals
+-- once per trigger, with no predictable duration for a per-second figure.
+settings.spellFilter, settings.topStat, settings.bottomStat = "heals", "amount", "perSecond"
+spells[120] = {"spell", 401859}
+primary.action, EABButton1.currentSlot = 120, 120
+events.ACTIONBAR_PAGE_CHANGED()
+EABButton1:OnAttributeChanged("action", 120)
+frame()
+for _, lines in ipairs({primary.TextOverlayContainer.labels, eabLines}) do
+    assert(lines[1].value == "172" and lines[2].value == "", "one Prayer of Mending activation appears in Heals only")
+end
+
+-- A restricted UNIT_AURA can hide the unit token too. Re-read the active
+-- proc so a lost Missile Barrage never leaves a doubled rate on either bar.
+local missileBarrage = {spellId = 400589}
+C_Secrets = {ShouldSpellAuraBeSecret = function() return false end}
+C_UnitAuras = {GetPlayerAuraBySpellID = function(id) assert(id == 400589); return missileBarrage end}
+settings.spellFilter = "all"
+spells[119] = {"spell", 5143}
+primary.action, EABButton1.currentSlot = 119, 119
+events.ACTIONBAR_PAGE_CHANGED()
+EABButton1:OnAttributeChanged("action", 119)
+frame()
+assert(bottom.value == "49.6" and eabLines[2].value == "49.6")
+missileBarrage = nil
+events.UNIT_AURA("party1")
+assert(not next(timers), "a readable unrelated aura needs no bar update")
+events.UNIT_AURA(secret)
+frame()
+assert(bottom.value == "24.8" and eabLines[2].value == "24.8")
 print("Action button overlay checks passed.")
