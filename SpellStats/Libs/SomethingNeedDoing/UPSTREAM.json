@@ -1,15 +1,15 @@
 {
   "repository": "https://github.com/elithrar/SomethingNeedDoing",
-  "version": "0.6.1",
-  "commit": "14431e1ab938fb6b6dcd533b0b852c966e2e8e8d",
+  "version": "0.6.2",
+  "commit": "dd74f734fa8152057ba517e54c6484b5406799d1",
   "sha256": {
-    "Core.lua": "b41398ddab27af09f99d1fc5a255bde632e17e35d0583f999691a19808556417",
+    "Core.lua": "7bebe60a85affc6bfed202ac8748b2921af00af77ccaa4a219d802db2d3f31fa",
     "Diagnostics.lua": "c1b9608bd0539d4f70bffebb492e71c185233abb5ade87413f8124439c3d0c6e",
     "Scope.lua": "88986749b088971b319cc55750ce67c607f80a438a4545a3f6641c3a4acf7eff",
     "State.lua": "2ec831ef4c4ca0d04fe64b2b33bd561eb92680e5b626628fbe56254226fcd71c",
     "Settings.lua": "044e0baae4d83e6c0a593444a2be2707cdc1bd46c6a069937b2a17b4cf68b154",
     "UI.lua": "e06651d79d94d5d2f40d2575ec7ec1895789da37934c592838e1aec18b590c9f",
-    "Options.lua": "da1b59e8ca31f5b360003233f1a4c73189072ca51aac407f8ecc979048911d81",
+    "Options.lua": "b1686ace8769da23ccb23059a539fab5d9404d41f6a472c051ee98fa2ce2ecb8",
     "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
   }
 }

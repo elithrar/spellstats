@@ -164,7 +164,8 @@ end
 local options = app:Options({
     title = "SpellStats",
     width = 448,
-    height = 464,
+    height = 480,
+    footer = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addon, "Version"),
     header = {width = 46, create = ns.CreatePreview},
     subheader = {width = 210, create = ns.CreateProfileSelector},
     layout = formLayout,

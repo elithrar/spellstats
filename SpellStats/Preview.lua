@@ -1,4 +1,4 @@
-local addon, ns = ...
+local _, ns = ...
 
 -- Level-60 baseline casts with no bonus spell power and 5,000 maximum mana.
 -- Renew includes five ticks; Fireball includes the hit and all four ticks.
@@ -24,23 +24,6 @@ local function lineChanged(previous, current, line)
         or previous[line .. "Align"] ~= current[line .. "Align"]
 end
 
-local function addVersion(shell)
-    local version = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addon, "Version")
-    if not version or version == "" or shell.spellStatsVersion then return end
-    local footer = shell:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    footer:SetJustifyH("RIGHT")
-    footer:SetTextColor(0.70, 0.65, 0.55, 0.88)
-    footer:SetText(version)
-    local scale = math.min(1, 11 / math.max(1, footer:GetStringHeight()))
-    footer:SetScale(scale)
-    footer:SetPoint("BOTTOMRIGHT", shell, "BOTTOMRIGHT", -34 / scale, 4 / scale)
-    local backing = shell:CreateTexture(nil, "ARTWORK")
-    backing:SetColorTexture(0.08, 0.065, 0.045, 0.84)
-    backing:SetPoint("TOPLEFT", footer, "TOPLEFT", -3, 0)
-    backing:SetPoint("BOTTOMRIGHT", footer, "BOTTOMRIGHT", 3, -1)
-    shell.spellStatsVersion = footer
-end
-
 function ns.CreatePreview(parent, app, scope)
     local preview = parent.spellStatsPreview
     if preview then
@@ -64,7 +47,6 @@ function ns.CreatePreview(parent, app, scope)
     local flash = button:CreateTexture(nil, "ARTWORK", nil, 2)
     flash:SetColorTexture(1, 0.79, 0.28, 0.38)
     flash:Hide()
-    addVersion(parent:GetParent())
 
     local selected = samples[1]
     local record = {button = button}

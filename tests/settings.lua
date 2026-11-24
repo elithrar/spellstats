@@ -76,8 +76,7 @@ function frameMethods:CreateFontString()
         SetShadowColor = noop, SetShadowOffset = noop, SetTextColor = noop,
         ClearAllPoints = noop, SetJustifyH = noop, SetWordWrap = noop,
         SetPoint = function(self, point, _, _, x, y) self.point, self.x, self.y = point, x, y end,
-        SetScale = function(self, scale) self.scale = scale end,
-        GetStringHeight = function() return self.fontHeight or 10 end,
+        GetStringHeight = function() return 10 end,
         SetText = function(self, text) self.text = text end,
         SetFont = function(self, path, size, flags) self.path, self.size, self.flags = path, size, flags end,
         GetFont = function(self) return self.path, self.size, self.flags end,
@@ -162,24 +161,11 @@ for _, key in ipairs({"topStat", "bottomStat"}) do
 end
 assert(controls.topSize.label == "Top text size" and controls.bottomSize.label == "Bottom text size")
 
-local preview, owner
-for _, height in ipairs({10, 22}) do
-    local shell = CreateFrame("Frame")
-    shell.fontHeight = height
-    local host = {GetParent = function() return shell end}
-    labels = {}
-    owner = ns.App:Scope()
-    preview = ns.CreatePreview(host, ns.App, owner)
-    local footer = assert(labels[1])
-    assert(#labels == 1 and footer.text == installedVersion and footer.point == "BOTTOMRIGHT")
-    local bottom = footer.y * footer.scale
-    assert(footer.x < 0 and bottom > 0 and bottom + height * footer.scale <= 16,
-        "the installed version must fit below the scroll area")
-    assert((footer.scale == 1) == (height == 10), "only the taller font should shrink")
-    assert(ns.CreatePreview(host, ns.App, owner) == preview and #labels == 1 and shell.textureCount == 1,
-        "reopening must reuse both the version label and its backing")
-end
-labels = {} -- collect only the two preview and two action-button rows below
+assert(options.footer == installedVersion, "the footer must use the installed TOC version")
+local host = CreateFrame("Frame")
+local owner = ns.App:Scope()
+local preview = ns.CreatePreview(host, ns.App, owner)
+assert(ns.CreatePreview(host, ns.App, owner) == preview)
 local realButton = {button = CreateFrame("Frame")}
 local estimate = ns.Estimate(27801, true) -- Holy Nova rank 6 at level 60
 for i, top in ipairs(currentChoices) do
