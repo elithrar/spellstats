@@ -1,10 +1,9 @@
--- Run from the project root with Lua 5.1 or texlua.
+-- Run with Lua 5.1.4 from the repository root or extracted ZIP.
 local ns = {}
 assert(loadfile("SpellStats/Libs/SomethingNeedDoing/Core.lua"))("SpellStats", ns)
 local secret = {}
 function issecretvalue(value) return value == secret end
 Enum = {PowerType = {Mana = 0}}
-unpack = unpack or table.unpack
 local level, healing, damage, maxMana = 20, 100, 200, 1250
 local inCombat = false
 function InCombatLockdown() return inCombat end

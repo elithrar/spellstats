@@ -1,5 +1,4 @@
--- Run from the repository root or the extracted release with Lua 5.1+.
-unpack = unpack or table.unpack
+-- Run with Lua 5.1.4 from the repository root or extracted ZIP.
 Enum = {PowerType = {Mana = 0}}
 SlashCmdList = {}
 local playerName

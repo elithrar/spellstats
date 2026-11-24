@@ -1,4 +1,4 @@
--- Run from the SpellStats project root with texlua tests/bars.lua.
+-- Run with Lua 5.1.4 from the repository root or extracted ZIP.
 local events, timers, spells, measured = {}, {}, {}, {}
 local inCombat = false
 local captures = 0
