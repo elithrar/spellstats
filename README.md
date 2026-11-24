@@ -20,8 +20,8 @@ Estimates use rank-specific coefficients and assume a noncritical cast on one ta
 
 ## Development
 
-Build the installable ZIP with `python3 tools/package.py`. The spell data generator records its sources in [SpellData.lua](SpellStats/SpellData.lua).
+Build the installable ZIP with `python3 tools/package.py`. Push an annotated version tag matching the TOC (for example, `v0.1.0`) on a commit reachable from `main` to publish a GitHub release. The tag message supplies the release notes. Set the Actions variable `CF_PROJECT_ID` and secret `CF_API_TOKEN` (or `CF_API_KEY`) to upload the same ZIP to CurseForge for WoW Forever.
 
 ## License
 
-SpellStats code is licensed under [Apache 2.0](LICENSE). For bundled components, see the [SomethingNeedDoing license](SpellStats/Libs/SomethingNeedDoing/LICENSE) and [spell data notice](SpellStats/THIRD-PARTY.txt).
+SpellStats code is licensed under [Apache 2.0](LICENSE). For bundled components, see the [SomethingNeedDoing license](SpellStats/Libs/SomethingNeedDoing/LICENSE) and [spell data notice](SpellStats/THIRD-PARTY.txt). The [release tooling](tools/XPISLAND-LICENSE.txt) uses the BSD 3-Clause license.

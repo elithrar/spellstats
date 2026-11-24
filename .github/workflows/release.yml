@@ -1,0 +1,91 @@
+# Adapted from XPIsland's BSD-3-Clause release workflow. See tools/XPISLAND-LICENSE.txt.
+name: Release SpellStats
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated version tag to publish or resume
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  validate:
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      commit: ${{ steps.metadata.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify version tag and Forever client metadata
+        id: metadata
+        run: python3 tools/release.py
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+      - name: Build and test the release ZIP
+        run: |
+          python3 tools/package.py
+          unzip -q "dist/SpellStats-${RELEASE_TAG#v}.zip" -d "$RUNNER_TEMP/install"
+          cd "$RUNNER_TEMP/install"
+          lua5.4 "$GITHUB_WORKSPACE/tests/model.lua"
+          lua5.4 "$GITHUB_WORKSPACE/tests/bars.lua"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-package
+          path: |
+            dist/SpellStats-${{ steps.metadata.outputs.version }}.zip
+            dist/SHA256SUMS
+            dist/release.json
+          if-no-files-found: error
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-package
+          path: dist
+          digest-mismatch: error
+      - name: Publish the GitHub release and exact ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 tools/publish_github.py
+      - name: Upload the same ZIP to CurseForge when configured
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CF_API_KEY }}
+        run: |
+          if [[ -n "$CF_PROJECT_ID" && -n "$CF_API_TOKEN" ]]; then
+            python3 tools/publish_curseforge.py
+          else
+            echo '::warning::CurseForge upload skipped. Configure CF_PROJECT_ID and CF_API_TOKEN (or CF_API_KEY), then rerun this tag.'
+            echo 'GitHub release published. CurseForge upload needs the CF_PROJECT_ID variable and CF_API_TOKEN (or CF_API_KEY) secret.' >> "$GITHUB_STEP_SUMMARY"
+          fi

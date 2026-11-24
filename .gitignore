@@ -1,0 +1,4 @@
+__pycache__/
+/dist/SHA256SUMS
+/dist/release.json
+/dist/curseforge-*.json
