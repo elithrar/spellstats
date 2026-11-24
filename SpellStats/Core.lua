@@ -32,6 +32,11 @@ local outlines = {
     {value = "OUTLINE", label = "Outline"},
     {value = "THICKOUTLINE", label = "Thick outline"},
 }
+local alignments = {
+    {value = "LEFT", label = "Left"},
+    {value = "CENTER", label = "Center"},
+    {value = "RIGHT", label = "Right"},
+}
 
 local function enum(default, choices)
     local values = {}
@@ -111,8 +116,10 @@ app:Settings({
         visibility = enum("always", visibility),
         outline = enum("OUTLINE", outlines),
         font = {type = "font", default = "Game tooltip"},
-        topSize = {type = "integer", min = 8, max = 16, default = 12},
-        bottomSize = {type = "integer", min = 8, max = 16, default = 11},
+        topAlign = enum("LEFT", alignments),
+        bottomAlign = enum("LEFT", alignments),
+        topSize = {type = "integer", min = 1, max = 64, default = 12},
+        bottomSize = {type = "integer", min = 1, max = 64, default = 11},
     },
 })
 
@@ -120,10 +127,54 @@ local function selectControl(key, label, choices)
     return {type = "select", id = key, key = key, label = label, choices = choices}
 end
 
+-- Unmodified Holy Nova rank 6 at level 60. It heals and deals damage, so
+-- every statistic can be previewed using the same cast on any character.
+local example = {isHeal = true, heal = 311, damage = 187, cost = 750}
+local function createPreview(parent)
+    if parent.spellStatsPreview then return parent.spellStatsPreview end
+
+    local clip = CreateFrame("Frame", nil, parent)
+    clip:SetAllPoints(parent)
+    clip:SetClipsChildren(true)
+    local button = CreateFrame("Frame", nil, clip)
+    button:SetAllPoints(clip)
+    local icon = button:CreateTexture(nil, "ARTWORK")
+    icon:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+    icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
+    icon:SetTexture("Interface\\Icons\\Spell_Holy_HolyNova")
+    local rim = button:CreateTexture(nil, "ARTWORK", nil, 1)
+    rim:SetAllPoints(button)
+    rim:SetAtlas("UI-HUD-ActionBar-IconFrame")
+    button:EnableMouse(true)
+    button:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("Holy Nova preview", 1, 0.82, 0)
+        GameTooltip:AddLine("Rank 6 with 5,000 maximum mana.")
+        GameTooltip:Show()
+    end)
+    local function hideTooltip(self)
+        if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
+    end
+    button:SetScript("OnLeave", hideTooltip)
+    button:SetScript("OnHide", hideTooltip)
+
+    local record = {button = button}
+    parent.spellStatsPreview = {
+        Refresh = function()
+            clip:Show()
+            ns.PaintButtonStats(record, ns.GetSettings(), example, 5000)
+        end,
+        Layout = function(_, width) return width end,
+        Hide = function() clip:Hide() end,
+    }
+    return parent.spellStatsPreview
+end
+
 local options = app:Options({
     title = "SpellStats",
     width = 448,
-    height = 368,
+    height = 438,
+    header = {width = 46, create = createPreview},
     layout = {
         columns = 2, minColumnWidth = 178, columnGap = 16,
         fieldWidth = 200, minLabelWidth = 80, gap = 8, rowGap = 6,
@@ -139,8 +190,10 @@ local options = app:Options({
             {title = "Text style", controls = {
                 {type = "font", key = "font", id = "font", label = "Font"},
                 selectControl("outline", "Outline", outlines),
-                {type = "slider", key = "topSize", id = "topSize", label = "Top size", step = 1},
-                {type = "slider", key = "bottomSize", id = "bottomSize", label = "Bottom size", step = 1},
+                selectControl("topAlign", "Top alignment", alignments),
+                selectControl("bottomAlign", "Bottom alignment", alignments),
+                {type = "slider", key = "topSize", id = "topSize", label = "Top size", step = 1, editable = true},
+                {type = "slider", key = "bottomSize", id = "bottomSize", label = "Bottom size", step = 1, editable = true},
             }},
         }},
     },

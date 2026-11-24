@@ -92,10 +92,8 @@ local function statistic(stat, estimate, maxMana)
     end
 end
 
-local function newLine(owner, position)
+local function newLine(owner)
     local text = owner:CreateFontString(nil, "OVERLAY")
-    text:SetPoint(position, owner, position, 2, position == "TOPLEFT" and -2 or 2)
-    text:SetJustifyH("LEFT")
     text:SetShadowColor(0, 0, 0, 1)
     text:SetShadowOffset(1, -1)
     return {text = text}
@@ -123,34 +121,104 @@ local function paintLine(line, text, color, size, outline)
     end
 end
 
-local function paintButton(record, settings, estimate, maxMana)
+local anchors = {
+    LEFT = {justify = "LEFT", fraction = 0, x = 2, TOP = "TOPLEFT", BOTTOM = "BOTTOMLEFT"},
+    CENTER = {justify = "CENTER", fraction = 0.5, x = 0, TOP = "TOP", BOTTOM = "BOTTOM"},
+    RIGHT = {justify = "RIGHT", fraction = 1, x = -2, TOP = "TOPRIGHT", BOTTOM = "BOTTOMRIGHT"},
+}
+
+-- Reserve space only where the text actually lies. Blizzard gives its hotkey
+-- a wide region, and EllesmereUI lets players move each caption independently.
+local function clearance(caption, edge, boundary, rowHeight, rowLeft, rowRight)
+    if not caption or not caption:IsShown() then return 2 end
+    local alpha = caption:GetAlpha()
+    if not values.Number(alpha) or alpha <= 0 then return 2 end
+    local text = caption:GetText()
+    if not values.Readable(text) or not text or text == "" then return 2 end
+    local left, bottom, width, height = caption:GetRect()
+    if not values.Number(left) or not values.Number(bottom) or
+        not values.Number(width) or not values.Number(height) then return 2 end
+    local ink = caption:GetStringWidth()
+    if not values.Number(ink) or ink <= 0 then return 2 end
+    ink = math.min(width, ink)
+    local justification = caption:GetJustifyH()
+    if not values.Readable(justification) then return 2 end
+    if justification == "RIGHT" then
+        left = left + width - ink
+    elseif justification == "CENTER" then
+        left = left + (width - ink) / 2
+    end
+    if rowRight <= left or rowLeft >= left + ink then return 2 end
+    if edge == "TOP" and bottom < boundary and bottom + height > boundary - 2 - rowHeight then
+        return boundary - bottom
+    elseif edge == "BOTTOM" and bottom + height > boundary and bottom < boundary + 2 + rowHeight then
+        return bottom + height - boundary
+    end
+    return 2
+end
+
+local function rowInset(button, line, edge, anchor, left, bottom, width, height)
+    if not line.value or not left then return 2 end
+    local textWidth, textHeight = line.text:GetStringWidth(), line.text:GetStringHeight()
+    if not values.Number(textWidth) or not values.Number(textHeight) then return 2 end
+    local rowLeft = left + (width - textWidth) * anchor.fraction + anchor.x
+    local rowRight = rowLeft + textWidth
+    local boundary = edge == "TOP" and bottom + height or bottom
+    local inset = math.max(
+        clearance(button.Name, edge, boundary, textHeight, rowLeft, rowRight),
+        clearance(button.HotKey, edge, boundary, textHeight, rowLeft, rowRight),
+        clearance(button.Count, edge, boundary, textHeight, rowLeft, rowRight))
+    return math.max(2, math.min(inset, height - textHeight - 2)), rowLeft, rowRight, textHeight
+end
+
+local function placeLine(line, owner, edge, anchor, inset)
+    if line.value and (line.anchor ~= anchor or line.inset ~= inset) then
+        local point = anchor[edge]
+        line.text:ClearAllPoints()
+        line.text:SetPoint(point, owner, point, anchor.x, edge == "TOP" and -inset or inset)
+        line.text:SetJustifyH(anchor.justify)
+        line.anchor, line.inset = anchor, inset
+    end
+end
+
+-- Each real or preview button keeps a record so settings changes move the
+-- same FontStrings and share the same formatting and native font fallback.
+function ns.PaintButtonStats(record, settings, estimate, maxMana)
     local top, topColor = statistic(settings.topStat, estimate, maxMana)
     local bottom, bottomColor = statistic(settings.bottomStat, estimate, maxMana)
+    local button = record.button
+    local owner = button.TextOverlayContainer or button
     if not record.top then
         if not top and not bottom then return end
-        local owner = record.button.TextOverlayContainer or record.button
-        record.top = newLine(owner, "TOPLEFT")
-        record.bottom = newLine(owner, "BOTTOMLEFT")
-    end
-    -- Macro names share the bottom edge of Blizzard's template. Leave the
-    -- native label in place and lift our number when the caption is in use.
-    if bottom then
-        local caption = record.button.Name
-        local offset = 2
-        if caption and caption:IsShown() then
-            local name = caption:GetText()
-            if not values.Readable(name) or (name and name ~= "") then
-                offset = offset + caption:GetHeight()
-            end
-        end
-        if record.captionOffset ~= offset then
-            local owner = record.button.TextOverlayContainer or record.button
-            record.bottom.text:SetPoint("BOTTOMLEFT", owner, "BOTTOMLEFT", 2, offset)
-            record.captionOffset = offset
-        end
+        record.top = newLine(owner)
+        record.bottom = newLine(owner)
     end
     paintLine(record.top, top, topColor, settings.topSize, settings.outline)
     paintLine(record.bottom, bottom, bottomColor, settings.bottomSize, settings.outline)
+    if not top and not bottom then return end
+    local topAnchor = anchors[settings.topAlign] or anchors.LEFT
+    local bottomAnchor = anchors[settings.bottomAlign] or anchors.LEFT
+    local left, base, width, height
+    if button.Name or button.HotKey or button.Count then
+        left, base, width, height = owner:GetRect()
+        if not (values.Number(left) and values.Number(base) and values.Number(width) and values.Number(height)) then
+            left = nil
+        end
+    end
+    local topInset, topLeft, topRight, topHeight = rowInset(button, record.top, "TOP", topAnchor, left, base, width, height)
+    local bottomInset, bottomLeft, bottomRight, bottomHeight = rowInset(button, record.bottom, "BOTTOM", bottomAnchor, left, base, width, height)
+    if topLeft and bottomLeft and topRight > bottomLeft and bottomRight > topLeft then
+        -- If both captions use this column, share the available vertical
+        -- space before the two SpellStats lines would cross each other.
+        local available = math.max(0, height - topHeight - bottomHeight - 4)
+        local requested = topInset + bottomInset - 4
+        if requested > available then
+            topInset = 2 + math.floor((topInset - 2) * available / requested)
+            bottomInset = 2 + available - (topInset - 2)
+        end
+    end
+    placeLine(record.top, owner, "TOP", topAnchor, topInset)
+    placeLine(record.bottom, owner, "BOTTOM", bottomAnchor, bottomInset)
 end
 
 local function refresh()
@@ -186,7 +254,7 @@ local function refresh()
                 if estimate and settings.spellFilter == "heals" and not estimate.isHeal then estimate = nil end
             end
         end
-        paintButton(record, settings, estimate, maxMana)
+        ns.PaintButtonStats(record, settings, estimate, maxMana)
     end
     estimates, variableCosts = used, manaDependent
 end
@@ -281,7 +349,7 @@ function ns.StartBars(owner, ownerScope)
         "ACTIONBAR_PAGE_CHANGED", "ACTIONBAR_SLOT_CHANGED", "ACTIONBAR_UPDATE_STATE", "UPDATE_BONUS_ACTIONBAR",
         "UPDATE_OVERRIDE_ACTIONBAR", "SPELL_UPDATE_ICON", "UPDATE_MACROS",
         "MODIFIER_STATE_CHANGED", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
-        "UPDATE_MOUSEOVER_UNIT",
+        "UPDATE_MOUSEOVER_UNIT", "UPDATE_BINDINGS", "SPELL_UPDATE_CHARGES",
     }) do
         listen(event, queueRefresh)
     end

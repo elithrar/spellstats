@@ -34,11 +34,18 @@ C_Spell = {GetOverrideSpell = function(id) return id == 775 and 774 or id end}
 
 local function newButton(slot)
     local owner = {labels = {}}
+    function owner:GetRect() return 0, 0, 45, 45 end
     function owner:CreateFontString()
         local text = {}
         function text:SetText(t) self.value = t end
-        function text:SetPoint(at, _, _, x, y) self.at, self.x, self.y = at, x, y end
-        function text:SetJustifyH() end
+        function text:ClearAllPoints() self.at = nil end
+        function text:SetPoint(at, _, _, x, y)
+            assert(not self.at, "realigning a line must remove its previous anchor")
+            self.at, self.x, self.y = at, x, y
+        end
+        function text:SetJustifyH(side) self.justify = side end
+        function text:GetStringWidth() return #self.value * self.size / 2 end
+        function text:GetStringHeight() return self.size end
         function text:SetShadowColor() end
         function text:SetShadowOffset() end
         function text:SetTextColor(r, g, b) self.color = {r, g, b} end
@@ -75,9 +82,18 @@ local function frame()
     for _, cb in pairs(batch) do cb() end
 end
 
+local function caption(value, justification, left, bottom, width, height)
+    return {value = value, alpha = 1,
+        GetText = function(self) return self.value end,
+        IsShown = function() return true end,
+        GetAlpha = function(self) return self.alpha end,
+        GetRect = function() return left, bottom, width, height end,
+        GetJustifyH = function() return justification end,
+        GetStringWidth = function(self) return #self.value * 6 end,
+    }
+end
 local primary, second = newButton(1), newButton(26)
-second.Name = {GetText = function() return "Heal" end, GetHeight = function() return 10 end,
-    IsShown = function() return true end}
+second.Name = caption("Heal", "CENTER", 3, 2, 39, 10)
 MainActionBar = {actionButtons = {primary}}
 MultiBar7 = {actionButtons = {second}}
 spells[1], spells[26] = {"spell", 775}, {"macro", 774, "spell"}
@@ -93,6 +109,58 @@ assert(second.TextOverlayContainer.labels[2].y == 12, "mana label clears the mac
 assert(top.color[2] > top.color[1] and bottom.color[3] > bottom.color[2])
 assert(measured[774] == 1, "duplicate spell and macro should share estimate")
 assert(top.size == 12 and bottom.size == 11 and top.flags == "OUTLINE")
+
+-- The same FontStrings move and repaint when settings change. Text on the
+-- other side of a stock keybind's wide layout region stays at the top edge.
+primary.HotKey = caption("R", "RIGHT", 4, 31, 38, 10)
+events.UPDATE_BINDINGS()
+frame()
+assert(top.y == -2 and top.justify == "LEFT")
+settings.topAlign, settings.bottomAlign = "RIGHT", "CENTER"
+ns.RefreshBars()
+frame()
+assert(top.at == "TOPRIGHT" and top.x == -2 and top.y == -14 and top.justify == "RIGHT")
+assert(bottom.at == "BOTTOM" and bottom.x == 0 and bottom.y == 2 and bottom.justify == "CENTER")
+local preview = {button = newButton(0)}
+preview.button.HotKey = primary.HotKey
+ns.PaintButtonStats(preview, settings, totals[774], maxMana)
+local sample = preview.button.TextOverlayContainer.labels
+for i, live in ipairs({top, bottom}) do
+    local line = sample[i]
+    assert(line.value == live.value and line.at == live.at and line.x == live.x and line.y == live.y)
+    assert(line.size == live.size and line.flags == live.flags and line.justify == live.justify)
+    for c = 1, 3 do assert(line.color[c] == live.color[c]) end
+end
+primary.HotKey.alpha = 0
+events.UPDATE_BINDINGS()
+frame()
+assert(top.y == -2, "a hidden Ellesmere keybind reserves no space")
+primary.HotKey.alpha, primary.HotKey.value = 1, secret
+events.UPDATE_BINDINGS()
+frame()
+assert(top.y == -2, "unreadable hotkey text must not be measured")
+primary.HotKey = nil
+primary.Count = caption("3", "RIGHT", 25, 3, 18, 11)
+settings.topAlign, settings.bottomAlign = "CENTER", "RIGHT"
+ns.RefreshBars()
+frame()
+assert(top.at == "TOP" and top.x == 0 and top.justify == "CENTER")
+assert(bottom.at == "BOTTOMRIGHT" and bottom.x == -2 and bottom.y == 14 and bottom.justify == "RIGHT")
+primary.HotKey = caption("R", "RIGHT", 4, 31, 38, 10)
+settings.topAlign = "RIGHT"
+ns.RefreshBars()
+frame()
+assert(45 + top.y - top.size >= bottom.y + bottom.size, "two right-aligned stats stay readable between native captions")
+primary.HotKey = nil
+settings.topSize, settings.bottomSize, settings.outline = 20, 8, "THICKOUTLINE"
+settings.topStat, settings.bottomStat = "hpm", "none"
+ns.PaintButtonStats(preview, settings, totals[774], maxMana)
+assert(sample[1].value == "1.49" and sample[1].size == 20 and sample[1].flags == "THICKOUTLINE")
+assert(sample[2].value == "" and #sample == 2)
+settings.topAlign, settings.bottomAlign = "LEFT", "LEFT"
+settings.topSize, settings.bottomSize, settings.outline = 12, 11, "OUTLINE"
+settings.topStat, settings.bottomStat = "heal", "manaPercent"
+primary.Count = nil
 
 primary.action = 13
 spells[13] = {"spell", 403}
