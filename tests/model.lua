@@ -174,4 +174,46 @@ fresh.RefreshPlayerStats() -- zero bonus healing is a valid new baseline
 inCombat, healing = true, secret
 near(fresh.Estimate(6063).heal, 543)
 
+-- Request casting information only for rate displays. The API reports
+-- milliseconds, including zero for a cast made instant by a proc.
+inCombat, level, healing, damage, bloomKnown = false, 60, 100, 200, false
+local castInfo, castLookups = {castTime = 2250}, 0
+C_Spell.GetSpellInfo = function()
+    castLookups = castLookups + 1
+    return castInfo
+end
+assert(ns.Estimate(6063).seconds == nil and ns.Estimate(98765, true).seconds == nil and castLookups == 0)
+near(ns.Estimate(6063, true).seconds, 2.25)
+castInfo = {castTime = 0}
+near(ns.Estimate(6063, true).seconds, 1.5) -- Heal with an instant-cast proc still occupies the GCD
+near(ns.Estimate(25299, true).seconds, 12) -- Rejuvenation delivers the full heal over 12 s
+assert(ns.Estimate(400616, true).seconds == nil) -- this instant Fire Blast variant is off the GCD
+castInfo = {castTime = 1750}
+near(ns.Estimate(9858, true).seconds, 22.75) -- Regrowth cast + its 21 s of healing
+near(ns.Estimate(348, true).seconds, 16.75) -- Immolate cast + its 15 s of damage
+local beforeChannels = castLookups
+near(ns.Estimate(402174, true).seconds, 2) -- Penance's linked channel delivers all three bolts
+near(ns.Estimate(15407, true).seconds, 3) -- Mind Flay's channel includes all three ticks
+assert(castLookups == beforeChannels)
+
+-- A hybrid can deliver its healing immediately and its damage over time.
+-- Match the amount renderer's heal-first choice even when healing is zero.
+local hybridID = 999999
+ns.SpellData[hybridID] = {kind = "damage", cast = 2, gcd = 1.5, damageDuration = 5,
+    components = {{kind = "heal", low = 0, high = 0, sp = 1}, {low = 20, high = 20}}}
+castInfo, healing = nil, 0
+local timed = ns.Estimate(hybridID, true)
+assert(timed.heal == 0 and timed.damage == 20 and timed.seconds == 2)
+healing = secret
+timed = ns.Estimate(hybridID, true)
+assert(timed.heal == nil and timed.damage == 20 and timed.seconds == 7)
+
+inCombat, healing = true, 100
+for _, unreadable in ipairs({secret, {castTime = secret}, {castTime = -1}, {castTime = math.huge}}) do
+    castInfo = unreadable
+    near(ns.Estimate(6063, true).seconds, 3) -- verified base cast time remains usable
+end
+C_Spell.GetSpellInfo = nil
+near(ns.Estimate(6063, true).seconds, 3)
+
 print("SpellStats model fixtures passed (" .. count .. " shipped ranks checked)")

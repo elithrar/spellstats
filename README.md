@@ -14,12 +14,14 @@ Open settings with `/spellstats`, `/spellstats opts` or `/spellstats options`. T
 
 | Setting | Choices |
 | --- | --- |
-| Top and bottom stats | Choose each row independently. Show median heal, median damage, heal or damage as appropriate, healing per mana (HPM), damage per mana (DPM), mana cost, mana percentage, or None. |
+| Top and bottom stats | Choose Heal/Damage (the estimated median), HPM/DPM (per mana), HPS/DPS (per second), mana cost, mana percentage, or None for each row. Spells that both heal and deal damage show their healing when available. |
 | Spells and combat | Show heals only or all spells. Keep numbers visible always, in combat, or out of combat. |
 | Text style | Choose a font and outline. Installed LibSharedMedia fonts also appear in the font menu. |
 | Size and alignment | Drag each row’s slider or type a font size from 1 to 64 and press Enter. Both rows start left-aligned. You can center or right-align either row. |
 
-Estimates use rank-specific coefficients and assume a noncritical cast on one target with all ticks completed. If WoW hides a stat during combat, SpellStats uses its last readable out-of-combat value. Target mitigation, overhealing, and some talent modifiers can change the result.
+Estimates use rank-specific coefficients and assume a noncritical cast on one target with all ticks completed. If WoW hides a player attribute such as spell power during combat, SpellStats uses its last readable out-of-combat value. Target mitigation, overhealing, and some talent modifiers can change the result.
+
+HPS/DPS averages one cast over the time it takes to deliver its healing or damage. It uses the current cast time when available, otherwise the rank’s base cast time. Global cooldowns, channels and periodic effects use their base durations. For example, a Renew that heals 930 over 15 seconds shows 62 HPS. If there is no measurable time window, the row stays blank.
 
 ## License
 

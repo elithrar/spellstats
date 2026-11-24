@@ -43,6 +43,10 @@ class Spell:
         self.tooltip = lookup(r'^tooltip\s+(.+)', block, "")
         self.school = lookup(r'^school\s+(.+)', block)
         self.duration = float(lookup(r'^duration\s+([.\d]+) s', block, 0))
+        # Arcane Shot and Serpent Sting use the export's negative cast-time sentinel.
+        self.cast = max(0, float(lookup(r'^cast\s+(-?[.\d]+) s', block, 0)))
+        self.gcd = float(lookup(r'^gcd\s+([.\d]+) s', block, 0))
+        self.channeled = "channeled" in lookup(r'^attrs\s+(.+)', block, "").split(", ")
         self.effects = []
         for summary, raw in re.findall(r'^effect \d+  (.+)\n\s+(E_.+)$', block, re.M):
             params = {k: float(v) for k, v in re.findall(r'\b(\w+)=(-?[\d.]+)', raw)}
@@ -70,6 +74,10 @@ def measure(spell, parent, raw, summary, p, kind, ticks, curve=False):
     out = dict(kind=kind, low=unit * (1 - variance), high=unit * (1 + variance))
     if ticks != 1:
         out["ticks"] = int(ticks)
+    # Preserve the elapsed time of measured pulses, including a single delayed
+    # tick (Bane of Doom). An unrelated aura on a direct hit has no such period.
+    if ticks > 1 or p.get("period"):
+        out["delivery"] = spell.duration or parent.duration
     for coefficient in ("sp", "ap", "rap"):
         if p.get(coefficient):
             out[coefficient] = p[coefficient]
@@ -187,6 +195,30 @@ def components(spell):
     return out
 
 
+def timing(spell, effects):
+    rank = dict(cast=spell.cast, gcd=spell.gcd)
+    if spell.channeled:
+        channel = spell.duration
+        if not channel:
+            # Penance's cast references the actual channel aura via $402261d.
+            helpers = (book.get(int(ref)) for ref in re.findall(r'\$(\d+)d\b', spell.tooltip))
+            durations = {aura.duration for aura in helpers if aura and aura.channeled and aura.duration}
+            if len(durations) != 1:
+                raise ValueError(f"Unresolved channel duration for {spell.id}")
+            channel = durations.pop()
+        rank["channel"] = channel
+
+    for effect in effects:
+        duration = effect.pop("delivery", 0)
+        if duration and not spell.channeled:
+            key = effect["kind"] + "Duration"
+            rank[key] = max(rank.get(key, 0), duration)
+            if effect.get("leech"):
+                rank["healDuration"] = max(rank.get("healDuration", 0), duration)
+
+    return rank
+
+
 def literal(v):
     if isinstance(v, str):
         return '"' + v + '"'
@@ -201,7 +233,7 @@ def literal(v):
     return format(v, ".7g")
 
 
-print("""-- Numeric spell effects from the Blizzard Forever 1.60.1.71037 client export:
+print("""-- Numeric spell effects and base timing (seconds) from the Blizzard Forever 1.60.1.71037 client export:
 -- https://github.com/wowsims/gamedata/tree/0c2b3f0dff123ea052afd3dbef43c1490907d419/spells
 -- Learn levels and per-level caps from SpellPowerCoefficients 1.0.2 (70888/70862):
 -- https://www.curseforge.com/wow/addons/spc-forever/files/9739224
@@ -237,6 +269,7 @@ for spell in sorted(book.values(), key=lambda s: (s.name, s.id)):
         record["ranked"] = False
     if spell.name == "Lay on Hands":
         record["allMana"] = True
+    record.update(timing(spell, out))
     for c in out:
         if c["kind"] == kind:
             del c["kind"]

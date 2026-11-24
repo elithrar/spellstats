@@ -2,22 +2,19 @@
 local events, timers, spells, measured = {}, {}, {}, {}
 local inCombat = false
 local captures = 0
+local timingReads = 0
 local secret = {}
 local settings = {
-    topStat = "heal", bottomStat = "manaPercent", spellFilter = "heals", visibility = "always",
+    topStat = "amount", bottomStat = "manaPercent", spellFilter = "heals", visibility = "always",
     topSize = 12, bottomSize = 11, outline = "OUTLINE",
 }
 local maxMana = 2000
 local totals = {
-    [774] = {heal = 182.25, cost = 122, isHeal = true},
-    [403] = {damage = 1950, cost = 300, isHeal = false},
+    [774] = {heal = 182.25, cost = 122, seconds = 15, isHeal = true},
+    [403] = {damage = 1950, cost = 300, seconds = 2, isHeal = false},
     [100] = {damage = 0, cost = 0, isHeal = false},
 }
 local ns = {
-    SomethingNeedDoing = {Values = {
-        Number = function(n) return type(n) == "number" end,
-        Readable = function(v) return v ~= secret end,
-    }},
     SpellData = {[403] = {allMana = true}},
     GetSettings = function() return settings end,
     RefreshPlayerStats = function()
@@ -25,11 +22,18 @@ local ns = {
         captures = captures + 1
     end,
     MaxMana = function() return maxMana end,
-    Estimate = function(id)
+    Estimate = function(id, includeTiming)
         measured[id] = (measured[id] or 0) + 1
-        return totals[id]
+        if includeTiming then timingReads = timingReads + 1 end
+        local spell = totals[id]
+        if spell then
+            return {heal = spell.heal, damage = spell.damage, isHeal = spell.isHeal, cost = spell.cost,
+                seconds = includeTiming and spell.seconds or nil}
+        end
     end,
 }
+function issecretvalue(value) return value == secret end
+assert(loadfile("SpellStats/Libs/SomethingNeedDoing/Core.lua"))("SpellStats", ns)
 function InCombatLockdown() return inCombat end
 function GetActionInfo(slot)
     local info = spells[slot] or {}
@@ -114,6 +118,7 @@ assert(top.at == "TOPLEFT" and bottom.at == "BOTTOMLEFT" and bottom.y == 2)
 assert(second.TextOverlayContainer.labels[2].y == 12, "mana label clears the macro name")
 assert(top.color[2] > top.color[1] and bottom.color[3] > bottom.color[2])
 assert(measured[774] == 1, "duplicate spell and macro should share estimate")
+assert(timingReads == 0, "default rows do not request cast timing")
 assert(top.size == 12 and bottom.size == 11 and top.flags == "OUTLINE")
 
 -- The same FontStrings move and repaint when settings change. Text on the
@@ -159,27 +164,70 @@ frame()
 assert(45 + top.y - top.size >= bottom.y + bottom.size, "two right-aligned stats stay readable between native captions")
 primary.HotKey = nil
 settings.topSize, settings.bottomSize, settings.outline = 20, 8, "THICKOUTLINE"
-settings.topStat, settings.bottomStat = "hpm", "none"
+settings.topStat, settings.bottomStat = "perMana", "none"
 ns.PaintButtonStats(preview, settings, totals[774], maxMana)
 assert(sample[1].value == "1.49" and sample[1].size == 20 and sample[1].flags == "THICKOUTLINE")
 assert(sample[2].value == "" and #sample == 2)
 settings.topAlign, settings.bottomAlign = "LEFT", "LEFT"
 settings.topSize, settings.bottomSize, settings.outline = 12, 11, "OUTLINE"
-settings.topStat, settings.bottomStat = "heal", "manaPercent"
+settings.topStat, settings.bottomStat = "perSecond", "perMana"
 primary.Count = nil
+ns.RefreshBars()
+frame()
+assert(timingReads == 1 and top.value == "12.15" and bottom.value == "1.49",
+    "selecting a timed row updates an already cached heal once")
+ns.PaintButtonStats(preview, settings, totals[774], maxMana)
+for i, live in ipairs({top, bottom}) do
+    assert(sample[i].value == live.value and sample[i].color[2] == live.color[2])
+end
 
 primary.action = 13
 spells[13] = {"spell", 403}
 events.ACTIONBAR_PAGE_CHANGED()
 frame()
 assert(top.value == "" and bottom.value == "", "heals-only removes old page text")
-settings.spellFilter, settings.topStat, settings.bottomStat = "all", "amount", "dpm"
+settings.spellFilter, settings.topStat, settings.bottomStat = "all", "amount", "perMana"
 settings.topSize, settings.outline = 16, ""
 ns.RefreshBars()
 frame()
 assert(top.value == "1950" and bottom.value == "6.5")
 assert(top.size == 16 and top.flags == "" and macroTop.value == "182")
 
+settings.topStat, settings.bottomStat = "perMana", "perSecond"
+ns.RefreshBars()
+frame()
+assert(top.value == "6.5" and bottom.value == "975")
+assert(macroTop.value == "1.49" and second.TextOverlayContainer.labels[2].value == "12.15")
+assert(top.color[1] > top.color[2] and bottom.color[1] > bottom.color[2] and macroTop.color[2] > macroTop.color[1])
+totals[403].seconds = 1.5
+events.UNIT_SPELL_HASTE("target")
+assert(next(timers) == nil)
+events.UNIT_SPELL_HASTE("player")
+frame()
+assert(bottom.value == "1300", "refresh the rate when the player's cast time changes")
+settings.topStat, settings.bottomStat = "perSecond", "amount"
+ns.RefreshBars()
+frame()
+assert(top.value == "1300" and bottom.value == "1950")
+
+local hybrid = {heal = 20, damage = 400, cost = 4, seconds = 2}
+ns.PaintButtonStats(preview, settings, hybrid, maxMana)
+assert(sample[1].value == "10" and sample[2].value == "20")
+settings.topStat, settings.bottomStat = "perMana", "perSecond"
+ns.PaintButtonStats(preview, settings, hybrid, maxMana)
+assert(sample[1].value == "5" and sample[2].value == "10" and sample[1].color[2] > sample[1].color[1])
+hybrid.heal = 0
+ns.PaintButtonStats(preview, settings, hybrid, maxMana)
+assert(sample[1].value == "0" and sample[2].value == "0", "a zero heal still takes precedence on hybrids")
+hybrid.cost, hybrid.seconds = nil, nil
+ns.PaintButtonStats(preview, settings, hybrid, maxMana)
+assert(sample[1].value == "" and sample[2].value == "")
+for _, invalid in ipairs({0, -1, math.huge, 0/0, secret}) do
+    hybrid.cost, hybrid.seconds = invalid, invalid
+    ns.PaintButtonStats(preview, settings, hybrid, maxMana)
+    assert(sample[1].value == "" and sample[2].value == "")
+end
+settings.topStat, settings.bottomStat = "amount", "perMana"
 settings.visibility = "combat"
 ns.RefreshBars()
 frame()
@@ -197,7 +245,7 @@ events.PLAYER_TARGET_CHANGED()
 frame()
 assert(macroTop.value == "", "numeric macro item ID is not a spell")
 
-settings.topStat, settings.bottomStat = "hpm", "manaPercent"
+settings.topStat, settings.bottomStat = "perMana", "manaPercent"
 spells[13] = {"spell", 774}
 events.ACTIONBAR_SLOT_CHANGED(13)
 frame()
@@ -208,7 +256,7 @@ events.UNIT_AURA("player")
 frame()
 assert(bottom.value == "12.2%")
 spells[13] = {"spell", 100}
-settings.topStat = "dpm"
+settings.topStat = "perMana"
 events.ACTIONBAR_SLOT_CHANGED(13)
 frame()
 assert(top.value == "" and bottom.value == "0%", "free cast must hide efficiency")
@@ -235,7 +283,7 @@ totals[403].damage = 123
 events.ENCOUNTER_END()
 frame()
 assert(top.value == "1.23", "after encounter, retry unavailable values")
-settings.visibility, settings.topStat, settings.bottomStat = "peace", "damage", "none"
+settings.visibility, settings.topStat, settings.bottomStat = "peace", "amount", "none"
 ns.RefreshBars()
 frame()
 assert(top.value == "")
@@ -274,7 +322,7 @@ local function ellesmereButton(currentSlot)
     return button
 end
 primary.visible, second.visible = false, false
-settings.topStat, settings.bottomStat = "heal", "manaPercent"
+settings.topStat, settings.bottomStat = "amount", "manaPercent"
 settings.spellFilter, settings.visibility = "heals", "always"
 maxMana = 2000
 spells[1], spells[109] = {"spell", 403}, {"spell", 774}

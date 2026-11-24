@@ -9,6 +9,7 @@ local barNames = {
 }
 local app, scope
 local buttons, estimates, variableCosts = {}, {}, {}
+local timingEnabled = false
 local refreshPending = false
 local playerStatsDirty = false
 local ellesmereModule, scanEllesmere, discoverEllesmere
@@ -78,17 +79,22 @@ end
 
 local function statistic(stat, estimate, maxMana)
     if not estimate then return end
-    if stat == "amount" then stat = estimate.heal and "heal" or "damage" end
-    if stat == "heal" or stat == "damage" then
-        if estimate[stat] then return compact(estimate[stat]), stat end
-    elseif stat == "manaCost" and estimate.cost then
+    if stat == "manaCost" and estimate.cost then
         return compact(estimate.cost), "mana"
     elseif stat == "manaPercent" and estimate.cost and maxMana and maxMana > 0 then
         return decimal(estimate.cost / maxMana * 100, "%.1f") .. "%", "mana"
-    elseif stat == "hpm" or stat == "dpm" then
-        local kind = stat == "hpm" and "heal" or "damage"
-        if estimate[kind] and estimate.cost and estimate.cost > 0 then
-            return decimal(estimate[kind] / estimate.cost, "%.2f"), kind
+    end
+    local kind = estimate.heal and "heal" or "damage"
+    local amount = estimate[kind]
+    if not amount then return end
+    if stat == "amount" then
+        return compact(amount), kind
+    elseif stat == "perMana" or stat == "perSecond" then
+        local denominator = estimate[stat == "perMana" and "cost" or "seconds"]
+        if values.Number(denominator) and denominator > 0 then
+            local rate = amount / denominator
+            if rate >= 1000 then return compact(rate), kind end
+            return decimal(rate, "%.2f"), kind
         end
     end
 end
@@ -237,6 +243,9 @@ local function refresh()
         if not inCombat then ns.RefreshPlayerStats() end
     end
     local settings = ns.GetSettings()
+    local includeTiming = settings.topStat == "perSecond" or settings.bottomStat == "perSecond"
+    if includeTiming and not timingEnabled then estimates = {} end
+    timingEnabled = includeTiming
     local visible = settings.visibility == "always" or
         (settings.visibility == "combat" and inCombat) or
         (settings.visibility == "peace" and not inCombat)
@@ -254,7 +263,7 @@ local function refresh()
                 estimate = used[id]
                 if estimate == nil then
                     estimate = estimates[id]
-                    if estimate == nil then estimate = ns.Estimate(id) or false end
+                    if estimate == nil then estimate = ns.Estimate(id, includeTiming) or false end
                     used[id] = estimate
                     local rank = ns.SpellData[id]
                     if rank and rank.allMana then manaDependent[id] = true end
@@ -387,6 +396,9 @@ function ns.StartBars(owner, ownerScope)
     }) do
         listen(event, playerChanged)
     end
+    listen("UNIT_SPELL_HASTE", function(unit)
+        if timingEnabled then playerChanged(unit) end
+    end)
     listen("UNIT_POWER_UPDATE", function(unit, powerType)
         if not next(variableCosts) or not values.Readable(unit) or not values.Readable(powerType) then return end
         if unit == "player" and powerType == "MANA" then

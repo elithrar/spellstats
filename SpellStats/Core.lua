@@ -9,11 +9,9 @@ app:Appearance({
 })
 
 local stats = {
-    {value = "heal", label = "Median heal"},
-    {value = "damage", label = "Median damage"},
-    {value = "amount", label = "Median heal or damage"},
-    {value = "hpm", label = "Healing per mana (HPM)"},
-    {value = "dpm", label = "Damage per mana (DPM)"},
+    {value = "amount", label = "Heal/Damage"},
+    {value = "perMana", label = "HPM/DPM"},
+    {value = "perSecond", label = "HPS/DPS"},
     {value = "manaPercent", label = "Mana cost (% of max)"},
     {value = "manaCost", label = "Mana cost"},
     {value = "none", label = "None"},
@@ -63,10 +61,13 @@ local function restoredValue(field, value)
     return field.default
 end
 
+local settingsVersion = 2
+local oldStats = {heal = "amount", damage = "amount", hpm = "perMana", dpm = "perMana"}
+
 local function settingsResult(values, readOnly)
     local result = {state = {values = values, readOnly = readOnly}}
     if not readOnly then
-        result.saved = {SpellStatsDB = {version = 1, values = values}}
+        result.saved = {SpellStatsDB = {version = settingsVersion, values = values}}
     end
     return result
 end
@@ -76,7 +77,7 @@ function storage:Restore(saved, fields)
     local current = saved.SpellStatsDB
     local source, readOnly
     if current ~= nil then
-        readOnly = type(current) ~= "table" or current.version ~= 1
+        readOnly = type(current) ~= "table" or (current.version ~= 1 and current.version ~= settingsVersion)
         if not readOnly then source = current.values end
     else
         -- WoW has restored the copied SpellInsight.lua file at this point.
@@ -88,7 +89,9 @@ function storage:Restore(saved, fields)
     end
     local values = {}
     for key, field in pairs(fields) do
-        values[key] = restoredValue(field, type(source) == "table" and source[key])
+        local value = type(source) == "table" and source[key]
+        if key == "topStat" or key == "bottomStat" then value = oldStats[value] or value end
+        values[key] = restoredValue(field, value)
     end
     return true, settingsResult(values, readOnly)
 end
@@ -110,7 +113,7 @@ app:Settings({
     savedVariables = {"SpellStatsDB"},
     adapter = storage,
     fields = {
-        topStat = enum("heal", stats),
+        topStat = enum("amount", stats),
         bottomStat = enum("manaPercent", stats),
         spellFilter = enum("heals", filters),
         visibility = enum("always", visibility),
@@ -129,7 +132,7 @@ end
 
 -- Unmodified Holy Nova rank 6 at level 60. It heals and deals damage, so
 -- every statistic can be previewed using the same cast on any character.
-local example = {isHeal = true, heal = 311, damage = 187, cost = 750}
+local example = {isHeal = true, heal = 311, damage = 187, cost = 750, seconds = 1.5}
 local function createPreview(parent)
     if parent.spellStatsPreview then return parent.spellStatsPreview end
 
@@ -157,6 +160,23 @@ local function createPreview(parent)
     end
     button:SetScript("OnLeave", hideTooltip)
     button:SetScript("OnHide", hideTooltip)
+
+    local version = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addon, "Version")
+    if version and version ~= "" then
+        local shell = parent:GetParent()
+        local footer = shell:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        footer:SetJustifyH("RIGHT")
+        footer:SetTextColor(0.70, 0.65, 0.55, 0.88)
+        footer:SetText(version)
+        -- Keep the native font inside the 16px footer, including in locales with taller glyphs.
+        local scale = math.min(1, 11 / math.max(1, footer:GetStringHeight()))
+        footer:SetScale(scale)
+        footer:SetPoint("BOTTOMRIGHT", shell, "BOTTOMRIGHT", -34 / scale, 4 / scale)
+        local backing = shell:CreateTexture(nil, "ARTWORK")
+        backing:SetColorTexture(0.08, 0.065, 0.045, 0.84)
+        backing:SetPoint("TOPLEFT", footer, "TOPLEFT", -3, 0)
+        backing:SetPoint("BOTTOMRIGHT", footer, "BOTTOMRIGHT", 3, -1)
+    end
 
     local record = {button = button}
     parent.spellStatsPreview = {
@@ -192,8 +212,8 @@ local options = app:Options({
                 selectControl("outline", "Outline", outlines),
                 selectControl("topAlign", "Top alignment", alignments),
                 selectControl("bottomAlign", "Bottom alignment", alignments),
-                {type = "slider", key = "topSize", id = "topSize", label = "Top size", step = 1, editable = true},
-                {type = "slider", key = "bottomSize", id = "bottomSize", label = "Bottom size", step = 1, editable = true},
+                {type = "slider", key = "topSize", id = "topSize", label = "Top text size", step = 1, editable = true},
+                {type = "slider", key = "bottomSize", id = "bottomSize", label = "Bottom text size", step = 1, editable = true},
             }},
         }},
     },

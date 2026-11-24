@@ -153,7 +153,30 @@ local function magnitude(rank, effect, kind, level, share)
     return math.max(0, amount) * (effect.ticks or 1)
 end
 
-function ns.Estimate(spellID)
+local function liveCastSeconds(spellID)
+    local info = C_Spell.GetSpellInfo(spellID)
+    if not values.Readable(info) or type(info) ~= "table" then return end
+    local milliseconds = info.castTime
+    if values.Number(milliseconds) and milliseconds >= 0 then return milliseconds / 1000 end
+end
+
+local function applicationSeconds(spellID, rank, healing)
+    local elapsed = rank.channel
+    if not elapsed then
+        local cast = rank.cast or 0
+        if C_Spell.GetSpellInfo then
+            local ok, live = pcall(liveCastSeconds, spellID)
+            if ok and live then cast = live end
+        end
+        local delivery = healing and (rank.healDuration or 0) or (rank.damageDuration or 0)
+        elapsed = cast + delivery
+    end
+    -- Casts and channels overlap the GCD. A channel already includes its ticks.
+    elapsed = math.max(rank.gcd or 0, elapsed)
+    if elapsed > 0 then return elapsed end
+end
+
+function ns.Estimate(spellID, includeTiming)
     if not values.Number(spellID) or spellID <= 0 then return end
     local rank = ns.SpellData[spellID]
     local result = {cost = manaCost(spellID, rank), isHeal = false}
@@ -184,5 +207,8 @@ function ns.Estimate(spellID)
     -- Don't display the direct hit alone if a periodic part couldn't be read.
     if missingHeal then result.heal = nil end
     if missingDamage then result.damage = nil end
+    if includeTiming and (result.heal or result.damage) then
+        result.seconds = applicationSeconds(spellID, rank, result.heal ~= nil)
+    end
     return result
 end
