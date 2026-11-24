@@ -10,24 +10,59 @@ local barNames = {
 local app, scope
 local buttons, estimates, variableCosts = {}, {}, {}
 local refreshPending = false
+local ellesmereModule, scanEllesmere, discoverEllesmere
 local colors = {
     heal = {0.40, 1.00, 0.45},
     damage = {1.00, 0.70, 0.32},
     mana = {0.45, 0.82, 1.00},
 }
 
-local function spellOnButton(button)
-    local slot = button.action
+local function spellFromMacro(slot, macroIndex)
+    local getName = C_ActionBar and C_ActionBar.GetActionText or GetActionText
+    if not (getName and GetMacroInfo and GetMacroItem and GetMacroSpell) then return end
+    -- Some macro actions expose an index without a resolved subtype. Verify
+    -- it against the button caption before asking the macro API for a spell.
+    local name = getName(slot)
+    local macroName = GetMacroInfo(macroIndex)
+    if not values.Readable(name) or not values.Readable(macroName) then return end
+    if type(name) ~= "string" or name == "" or macroName ~= name then return end
+    local item = GetMacroItem(macroIndex)
+    if not values.Readable(item) or item then return end
+    return GetMacroSpell(macroIndex)
+end
+
+local function spellOnButton(record)
+    local button = record.button
+    local slot
+    if record.ellesmere then
+        -- The suffix identifies a permanent frame. Its secure action attribute
+        -- follows the bar's page and can differ from the template's .action.
+        slot = button:GetAttribute("action")
+    else
+        slot = button.action
+    end
     if not values.Number(slot) or slot < 1 then return end
     local kind, id, subtype = GetActionInfo(slot)
     if not values.Readable(kind) or not values.Number(id) or id < 1 then return end
     -- For a spell macro, GetActionInfo already returns its currently resolved
     -- spell ID. Treating that number as a macro index breaks conditional macros.
-    if kind ~= "spell" and not (kind == "macro" and values.Readable(subtype) and subtype == "spell") then
+    if kind == "macro" then
+        if not values.Readable(subtype) then return end
+        if subtype == nil then
+            id = spellFromMacro(slot, id)
+            if not values.Number(id) or id < 1 then return end
+        elseif subtype ~= "spell" then
+            return
+        end
+    elseif kind ~= "spell" then
         return
     end
-    local resolved = C_Spell.GetOverrideSpell(id)
-    if values.Number(resolved) and resolved > 0 then return resolved end
+    if C_Spell.GetOverrideSpell then
+        local resolved = C_Spell.GetOverrideSpell(id)
+        if not values.Readable(resolved) then return end
+        if values.Number(resolved) and resolved > 0 then return resolved end
+    end
+    return id
 end
 
 local function decimal(value, precision)
@@ -120,6 +155,10 @@ end
 
 local function refresh()
     refreshPending = false
+    if scanEllesmere then
+        scanEllesmere = false
+        discoverEllesmere()
+    end
     local settings = ns.GetSettings()
     local inCombat = InCombatLockdown()
     local visible = settings.visibility == "always" or
@@ -134,7 +173,7 @@ local function refresh()
     for button, record in pairs(buttons) do
         local estimate
         if enabled and button:IsVisible() then
-            local id = spellOnButton(button)
+            local id = spellOnButton(record)
             if id then
                 estimate = used[id]
                 if estimate == nil then
@@ -174,19 +213,59 @@ function ns.RefreshBars()
     queueRefresh()
 end
 
+local function actionChanged(_, attribute)
+    if values.Readable(attribute) and attribute == "action" then queueRefresh() end
+end
+
+local function watchButton(button, ellesmere)
+    if buttons[button] then return end
+    buttons[button] = {button = button, ellesmere = ellesmere}
+    local ok, err = scope:HookScript(button, "OnShow", queueRefresh)
+    if not ok then app.log:Warn("Could not watch action button", {reason = err.message}) end
+    if ellesmere then
+        ok, err = scope:HookScript(button, "OnAttributeChanged", actionChanged)
+        if not ok then app.log:Warn("Could not watch EllesmereUI button paging", {reason = err.message}) end
+    end
+end
+
+-- EllesmereUI 9.9.2 names its ten bars' buttons by their original slot.
+-- EABButton109..120 and EABButton145..180 live beyond the first six pages.
+discoverEllesmere = function()
+    for slot = 1, 180 do
+        local button = _G["EABButton" .. slot]
+        if button and button.GetAttribute then watchButton(button, true) end
+    end
+end
+
+local function watchEllesmere()
+    local modules = EllesmereUI and EllesmereUI._ModuleNS
+    local module = modules and modules.EllesmereUIActionBars
+    if module and module ~= ellesmereModule and type(module.BuildBarButtons) == "function" then
+        -- The provider builds enabled bars after login and builds previously
+        -- disabled bars on demand. Inspect frames after that construction pass.
+        local ok, err = scope:PostHook(module, "BuildBarButtons", function()
+            scanEllesmere = true
+            queueRefresh()
+        end)
+        if ok then
+            ellesmereModule = module
+        else
+            app.log:Warn("Could not watch EllesmereUI bar creation", {reason = err.message})
+        end
+    end
+    scanEllesmere = true
+end
+
 local function discover()
     for _, name in ipairs(barNames) do
         local bar = _G[name]
         if bar and bar.actionButtons then
             for _, button in ipairs(bar.actionButtons) do
-                if not buttons[button] then
-                    local ok, err = scope:HookScript(button, "OnShow", queueRefresh)
-                    if not ok then app.log:Warn("Could not watch action button", {reason = err.message}) end
-                    buttons[button] = {button = button}
-                end
+                watchButton(button, false)
             end
         end
     end
+    watchEllesmere()
     invalidate()
 end
 
@@ -239,7 +318,7 @@ function ns.StartBars(owner, ownerScope)
         end
     end)
     listen("ADDON_LOADED", function(name)
-        if name == "Blizzard_ActionBar" then discover() end
+        if name == "Blizzard_ActionBar" or name == "EllesmereUIActionBars" then discover() end
     end)
     listen("PLAYER_ENTERING_WORLD", discover)
     discover()

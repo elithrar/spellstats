@@ -60,6 +60,14 @@ local scope = {
     After = function(_, _, key, cb) assert(not timers[key]); timers[key] = cb; return true end,
     Event = function(_, event, cb) events[event] = cb; return true end,
     HookScript = function(_, button, event, cb) button[event] = cb; return true end,
+    PostHook = function(_, module, name, cb)
+        local original = assert(module[name], name)
+        module[name] = function(...)
+            original(...)
+            cb(...)
+        end
+        return true
+    end,
 }
 local function frame()
     local batch = timers
@@ -179,4 +187,100 @@ frame()
 assert(top.value == "", "restricted spell ID clears old text")
 assert(#primary.TextOverlayContainer.labels == 2 and #second.TextOverlayContainer.labels == 2)
 assert(next(timers) == nil, "idle bars have no scheduled work")
+
+-- EllesmereUIActionBars creates its own named buttons and retires the stock
+-- bars. The suffix identifies the original slot. Its secure paging driver
+-- writes the currently displayed slot into the button's "action" attribute.
+local function ellesmereButton(currentSlot)
+    local button = newButton(26) -- stale Blizzard mixin state after a page change
+    button.currentSlot = currentSlot
+    function button:GetAttribute(key)
+        if key == "action" then return self.currentSlot end
+    end
+    return button
+end
+primary.visible, second.visible = false, false
+settings.topStat, settings.bottomStat = "heal", "manaPercent"
+settings.spellFilter, settings.visibility = "heals", "always"
+maxMana = 2000
+spells[1], spells[109] = {"spell", 403}, {"spell", 774}
+EABButton1 = ellesmereButton(109)
+EABButton109 = ellesmereButton(109)
+local eabModule = {
+    BuildBarButtons = function()
+        EABButton180 = ellesmereButton(109)
+    end,
+}
+EllesmereUI = {_ModuleNS = {EllesmereUIActionBars = eabModule}}
+events.ADDON_LOADED("EllesmereUIActionBars")
+frame()
+local eabLines = EABButton1.TextOverlayContainer.labels
+local customLines = EABButton109.TextOverlayContainer.labels
+assert(eabLines[1] and eabLines[1].value == "182" and eabLines[2].value == "6.1%",
+    "default heal and mana rows must appear on the visible Ellesmere button")
+assert(customLines[1] and customLines[1].value == "182", "custom Ellesmere Bar10 also gets labels")
+events.PLAYER_ENTERING_WORLD()
+frame()
+
+-- A custom modifier page can change the secure attribute in combat without
+-- a native ACTIONBAR_PAGE_CHANGED. The original static bar remains on 109.
+inCombat = true
+EABButton1.currentSlot = 1
+EABButton1:OnAttributeChanged("action", 1)
+frame()
+assert(eabLines[1].value == "" and eabLines[2].value == "",
+    "heals-only clears both rows after Ellesmere pages to a damaging spell")
+assert(customLines[1].value == "182")
+EABButton1.currentSlot = 109
+EABButton1:OnAttributeChanged("action", 109)
+frame()
+assert(eabLines[1].value == "182" and eabLines[2].value == "6.1%")
+inCombat = false
+eabModule.BuildBarButtons()
+frame() -- coalesced provider discovery
+frame() -- paint the discovered buttons
+local lateLines = EABButton180.TextOverlayContainer.labels
+assert(lateLines[1] and lateLines[1].value == "182" and lateLines[2].value == "6.1%",
+    "opening a previously unbuilt Ellesmere bar after login must discover its buttons")
+local override
+C_Spell.GetOverrideSpell = function() return override end
+events.ACTIONBAR_SLOT_CHANGED(109)
+frame()
+assert(eabLines[1].value == "182", "a missing override must preserve the original spell ID")
+override = 0
+events.ACTIONBAR_SLOT_CHANGED(109)
+frame()
+assert(eabLines[1].value == "182", "zero is not a usable override spell ID")
+override = secret
+events.ACTIONBAR_SLOT_CHANGED(109)
+frame()
+assert(eabLines[1].value == "" and eabLines[2].value == "",
+    "clear restricted override results instead of displaying a possibly unrelated spell")
+
+-- Some macro slots expose the macro index and omit the subtype. Resolve the
+-- index only when its name matches the slot's label and it is a spell macro.
+C_Spell.GetOverrideSpell = function(id) return id end
+local macroName, actionName, macroItem = "Quick heal", "Quick heal", nil
+C_ActionBar = {GetActionText = function(slot) if slot == 109 then return actionName end end}
+function GetMacroInfo(index) if index == 7 then return macroName end end
+function GetMacroSpell(index) if index == 7 then return 774 end end
+function GetMacroItem(index) if index == 7 then return macroItem end end
+spells[109] = {"macro", 7}
+events.ACTIONBAR_SLOT_CHANGED(109)
+frame()
+assert(eabLines[1].value == "182", "resolve the active spell of a matching index-only macro")
+macroItem = "Healing Potion"
+events.UPDATE_MACROS()
+frame()
+assert(eabLines[1].value == "", "an item macro cannot be interpreted as a heal")
+macroItem, actionName = nil, "Different macro"
+events.UPDATE_MACROS()
+frame()
+assert(eabLines[1].value == "", "a macro index from a different slot cannot supply this spell")
+actionName = secret
+events.UPDATE_MACROS()
+frame()
+assert(eabLines[1].value == "", "restricted macro identity leaves the rows empty")
+assert(#eabLines == 2 and #customLines == 2, "repeated displays must reuse the two labels")
+assert(next(timers) == nil, "Ellesmere bars should also be idle after rendering")
 print("Action button overlay checks passed.")

@@ -2,11 +2,11 @@
 
 <img src="icon.png" alt="A pixel-art mana crystal with an emerald eye" width="96" height="96" align="right">
 
-SpellStats shows what a cast will heal or damage and how much mana it will cost, right on your World of Warcraft: Forever action buttons. By default, healing spells show the estimated median heal on top and the percentage of your maximum mana spent on the bottom, both in and out of combat.
+SpellStats shows what a cast will heal or damage and how much mana it will cost, right on your World of Warcraft: Forever action buttons, including EllesmereUI Action Bars. By default, healing spells show the estimated median heal on top and the percentage of your maximum mana spent on the bottom, both in and out of combat.
 
 ## Installation
 
-Extract the ZIP into your Forever client’s `Interface/AddOns/` directory and restart WoW. Type `/spellstats` to open settings. The aliases `/spellstats opts` and `/spellstats options` open the same panel. SomethingNeedDoing is bundled. [Download SpellStats](https://github.com/elithrar/spellstats/raw/refs/heads/main/dist/SpellStats-0.1.1.zip)
+Extract the ZIP into your Forever client’s `Interface/AddOns/` directory and restart WoW. Type `/spellstats` to open settings. The aliases `/spellstats opts` and `/spellstats options` open the same panel. SomethingNeedDoing is bundled. [Download SpellStats](https://github.com/elithrar/spellstats/raw/refs/heads/main/dist/SpellStats-0.1.2.zip)
 
 | Setting | Choices |
 | --- | --- |
@@ -20,7 +20,7 @@ Estimates use rank-specific coefficients and assume a noncritical cast on one ta
 
 ## Development
 
-Build the installable ZIP with `python3 tools/package.py`. Push an annotated version tag matching the TOC (for example, `v0.1.1`) on a commit reachable from `main` to publish a GitHub release. The tag message supplies the release notes. Set `CF_PROJECT_ID` as an Actions secret or variable and set the secret `CF_API_TOKEN` (or `CF_API_KEY`) to upload the same ZIP to CurseForge for WoW Forever.
+Build the installable ZIP with `python3 tools/package.py`. Push an annotated version tag matching the TOC (for example, `v0.1.2`) on a commit reachable from `main` to publish a GitHub release. The tag message supplies the release notes. Set `CF_PROJECT_ID` as an Actions secret or variable and set the secret `CF_API_TOKEN` (or `CF_API_KEY`) to upload the same ZIP to CurseForge for WoW Forever.
 
 ## License
 

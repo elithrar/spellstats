@@ -3,13 +3,18 @@ local app = ns.SomethingNeedDoing:NewAddon(addon)
 local scope = app:Scope("action-bars")
 ns.App = app
 
+app:Appearance({
+    defaultTheme = "forever",
+    themes = {forever = ns.SomethingNeedDoing.Themes.forever},
+})
+
 local stats = {
     {value = "heal", label = "Median heal"},
     {value = "damage", label = "Median damage"},
     {value = "amount", label = "Median heal or damage"},
     {value = "hpm", label = "Healing per mana (HPM)"},
     {value = "dpm", label = "Damage per mana (DPM)"},
-    {value = "manaPercent", label = "Mana cost (%)"},
+    {value = "manaPercent", label = "Mana cost (% of max)"},
     {value = "manaCost", label = "Mana cost"},
     {value = "none", label = "None"},
 }
@@ -117,25 +122,25 @@ end
 
 local options = app:Options({
     title = "SpellStats",
-    width = 490,
-    height = 360,
-    layout = {fieldWidth = 220, minLabelWidth = 140},
+    width = 448,
+    height = 368,
+    layout = {
+        columns = 2, minColumnWidth = 178, columnGap = 16,
+        fieldWidth = 200, minLabelWidth = 80, gap = 8, rowGap = 6,
+    },
     pages = {
         {id = "display", label = "Display", sections = {
-            {controls = {
+            {title = "Action buttons", controls = {
                 selectControl("topStat", "Top stat", stats),
                 selectControl("bottomStat", "Bottom stat", stats),
                 selectControl("spellFilter", "Spells", filters),
-                selectControl("visibility", "Show stats", visibility),
-                {type = "description", text = "Mana cost (%) is the share of your maximum mana spent on one cast."},
+                selectControl("visibility", "When to show", visibility),
             }},
-        }},
-        {id = "appearance", label = "Appearance", sections = {
-            {controls = {
+            {title = "Text style", controls = {
                 {type = "font", key = "font", id = "font", label = "Font"},
-                selectControl("outline", "Text outline", outlines),
-                {type = "slider", key = "topSize", id = "topSize", label = "Top font size", step = 1},
-                {type = "slider", key = "bottomSize", id = "bottomSize", label = "Bottom font size", step = 1},
+                selectControl("outline", "Outline", outlines),
+                {type = "slider", key = "topSize", id = "topSize", label = "Top size", step = 1},
+                {type = "slider", key = "bottomSize", id = "bottomSize", label = "Bottom size", step = 1},
             }},
         }},
     },
