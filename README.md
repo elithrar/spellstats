@@ -17,7 +17,7 @@ Open settings with `/spellstats`, `/spellstats opts` or `/spellstats options`. C
 | Top and bottom stats | Choose Heal/Damage (the estimated median), HPM/DPM (per mana), HPS/DPS (per second), mana cost, mana percentage, or None for each row. Spells that both heal and deal damage show their healing when available. |
 | Profiles | Characters start on Shared. Use the profile menu to give a character its own copy or select an existing profile. Hover over the selector to see who shares the active settings. |
 | Spells and combat | Show heals only or all spells. Keep numbers visible always, in combat, or out of combat. |
-| Text style | Choose a font and outline. Installed LibSharedMedia fonts also appear in the font menu. |
+| Text style | Choose a font and outline. The font menu previews each typeface, including installed LibSharedMedia fonts. |
 | Size and alignment | Drag each row’s slider or type a font size from 1 to 64 and press Enter. Both rows start left-aligned. You can center or right-align either row. |
 
 Estimates use rank-specific coefficients and assume a noncritical cast on one target with all ticks completed. If WoW hides a player attribute such as spell power during combat, SpellStats uses its last readable out-of-combat value. Target mitigation, overhealing, and some talent modifiers can change the result.

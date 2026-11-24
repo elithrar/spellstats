@@ -164,7 +164,7 @@ end
 local options = app:Options({
     title = "SpellStats",
     width = 448,
-    height = 456,
+    height = 464,
     header = {width = 46, create = ns.CreatePreview},
     subheader = {width = 210, create = ns.CreateProfileSelector},
     layout = formLayout,
