@@ -80,12 +80,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+          CF_PROJECT_ID: ${{ secrets.CF_PROJECT_ID || vars.CF_PROJECT_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CF_API_KEY }}
         run: |
           if [[ -n "$CF_PROJECT_ID" && -n "$CF_API_TOKEN" ]]; then
             python3 tools/publish_curseforge.py
           else
             echo '::warning::CurseForge upload skipped. Configure CF_PROJECT_ID and CF_API_TOKEN (or CF_API_KEY), then rerun this tag.'
-            echo 'GitHub release published. CurseForge upload needs the CF_PROJECT_ID variable and CF_API_TOKEN (or CF_API_KEY) secret.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'GitHub release published. CurseForge upload needs the CF_PROJECT_ID secret or variable and CF_API_TOKEN (or CF_API_KEY) secret.' >> "$GITHUB_STEP_SUMMARY"
           fi

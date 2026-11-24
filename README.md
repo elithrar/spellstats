@@ -20,7 +20,7 @@ Estimates use rank-specific coefficients and assume a noncritical cast on one ta
 
 ## Development
 
-Build the installable ZIP with `python3 tools/package.py`. Push an annotated version tag matching the TOC (for example, `v0.1.0`) on a commit reachable from `main` to publish a GitHub release. The tag message supplies the release notes. Set the Actions variable `CF_PROJECT_ID` and secret `CF_API_TOKEN` (or `CF_API_KEY`) to upload the same ZIP to CurseForge for WoW Forever.
+Build the installable ZIP with `python3 tools/package.py`. Push an annotated version tag matching the TOC (for example, `v0.1.0`) on a commit reachable from `main` to publish a GitHub release. The tag message supplies the release notes. Set `CF_PROJECT_ID` as an Actions secret or variable and set the secret `CF_API_TOKEN` (or `CF_API_KEY`) to upload the same ZIP to CurseForge for WoW Forever.
 
 ## License
 
