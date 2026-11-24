@@ -270,6 +270,35 @@ SND._install[#SND._install + 1] = function(app)
         end
         return true
     end
+    -- Keep Blizzard's radio semantics, hit testing and hover. Forever's
+    -- Vanilla/MenuVariants.lua supplies the same left texture on each radio.
+    local function styleRadio(button,description)
+        local mark=button.leftTexture1
+        if mark then
+            mark:SetAtlas(description:IsSelected() and 'common-dropdown-icon-checkmark-yellow-classic-2' or nil)
+            mark:SetSize(20,20)
+        end
+    end
+    function ui:StyleMenu(root)
+        if app._disposed then return false,I.error('unavailable')end
+        I.check(type(root)=='table' and type(root.AddMenuAcquiredCallback)=='function','root menu description required')
+        local theme=resolved()
+        if usesGameArtwork[theme] then
+            local surface=theme.colors.surface
+            root:AddMenuAcquiredCallback(function(menu)
+                -- The compositor releases this fill when the native popup is
+                -- reclaimed. Its border and the rows draw above it.
+                local fill=menu:AttachTexture()
+                fill:SetDrawLayer('BACKGROUND')
+                fill:SetColorTexture(surface[1],surface[2],surface[3],1)
+                fill:SetAllPoints()
+            end)
+            MenuUtil.TraverseMenu(root,function(description)
+                if description:IsRadio() then description:AddInitializer(styleRadio)end
+            end)
+        end
+        return true
+    end
     function ui:Color(object,role)
         I.check(not app._disposed,'appearance service is disposed')
         for _,definition in pairs(definitions)do if not definition.colors[role] then return false,I.error('invalid','Color role must exist in every theme')end end
@@ -361,12 +390,18 @@ SND._install[#SND._install + 1] = function(app)
         if options==nil then options={}end
         I.check(I.plain(options) and (options.size==nil or (V.Number(options.size) and options.size>0)) and (options.flags==nil or type(options.flags)=='string'),'invalid font options')
         startFonts()
-        local entry=applications[object] or {};applications[object]=entry
+        local entry=applications[object] or {}
+        local previousRole,previousOptions=entry.role,entry.options
         entry.role,entry.options=role,I.copy(options)
         local before=generation
         local ran,ok,err=pcall(apply,object,entry)
         if not ran then ok,err=false,I.error('unavailable',ok)end
-        if not ok then applications[object]=nil end
+        if ok then
+            applications[object]=entry
+            entry.refreshFailed=nil
+        else
+            entry.role,entry.options=previousRole,previousOptions
+        end
         if generation~=before and not refreshing then refreshFonts(false) end
         return ok,err
     end
@@ -388,7 +423,16 @@ SND._install[#SND._install + 1] = function(app)
         media=getMedia()
         for _=1,3 do
             local before=generation
-            for object,role in pairs(applications)do local ok,applied,err=pcall(apply,object,role);if not ok then applications[object]=nil;I.report(app,applied)elseif not applied then applications[object]=nil;I.report(app,err)end end
+            for object,entry in pairs(applications)do
+                local ok,applied,err=pcall(apply,object,entry)
+                if ok and applied then
+                    entry.refreshFailed=nil
+                elseif not entry.refreshFailed then
+                    -- Keep the binding for the next refresh and report once per failure.
+                    entry.refreshFailed=true
+                    I.report(app,ok and err or applied)
+                end
+            end
             if before==generation then break end
         end
         refreshing = nil

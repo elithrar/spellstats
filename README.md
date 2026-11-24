@@ -10,11 +10,12 @@ SpellStats shows what a cast will heal or damage and how much mana it will cost,
 
 For a manual install, extract the ZIP into your Forever client’s `Interface/AddOns/` directory and restart WoW. SomethingNeedDoing is bundled.
 
-Open settings with `/spellstats`, `/spellstats opts` or `/spellstats options`. The Holy Nova button in the upper-right corner previews your text using a sample cast, even with empty or hidden action bars. Click the red X to close the window.
+Open settings with `/spellstats`, `/spellstats opts` or `/spellstats options`. Click the preview button in the upper right to try Holy Nova, Heal, Renew or Fireball, even with empty action bars. Editing a line highlights it on the preview.
 
 | Setting | Choices |
 | --- | --- |
 | Top and bottom stats | Choose Heal/Damage (the estimated median), HPM/DPM (per mana), HPS/DPS (per second), mana cost, mana percentage, or None for each row. Spells that both heal and deal damage show their healing when available. |
+| Profiles | Characters start on Shared. Use the profile menu to give a character its own copy or select an existing profile. Hover over the selector to see who shares the active settings. |
 | Spells and combat | Show heals only or all spells. Keep numbers visible always, in combat, or out of combat. |
 | Text style | Choose a font and outline. Installed LibSharedMedia fonts also appear in the font menu. |
 | Size and alignment | Drag each row’s slider or type a font size from 1 to 64 and press Enter. Both rows start left-aligned. You can center or right-align either row. |

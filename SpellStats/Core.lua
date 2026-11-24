@@ -44,74 +44,10 @@ local function enum(default, choices)
     return {type = "enum", default = default, values = values}
 end
 
--- Normalize each restored field independently so an obsolete selection cannot
--- prevent the other action-bar preferences from loading.
-local function restoredValue(field, value)
-    if field.type == "enum" then
-        for _, allowed in ipairs(field.values) do
-            if value == allowed then return value end
-        end
-    elseif field.type == "integer" then
-        if type(value) == "number" and value >= field.min and value <= field.max and value == math.floor(value) then
-            return value
-        end
-    elseif field.type == "font" and type(value) == "string" and #value > 0 and #value <= 256 then
-        return value
-    end
-    return field.default
-end
-
-local settingsVersion = 2
-local oldStats = {heal = "amount", damage = "amount", hpm = "perMana", dpm = "perMana"}
-
-local function settingsResult(values, readOnly)
-    local result = {state = {values = values, readOnly = readOnly}}
-    if not readOnly then
-        result.saved = {SpellStatsDB = {version = settingsVersion, values = values}}
-    end
-    return result
-end
-
-local storage = {}
-function storage:Restore(saved, fields)
-    local current = saved.SpellStatsDB
-    local source, readOnly
-    if current ~= nil then
-        readOnly = type(current) ~= "table" or (current.version ~= 1 and current.version ~= settingsVersion)
-        if not readOnly then source = current.values end
-    else
-        -- WoW has restored the copied SpellInsight.lua file at this point.
-        -- Read the active SND profile without changing the original database.
-        local old = _G.SpellInsightDB
-        if type(old) == "table" and old.version == 1 and type(old.profiles) == "table" and type(old.active) == "string" then
-            source = old.profiles[old.active]
-        end
-    end
-    local values = {}
-    for key, field in pairs(fields) do
-        local value = type(source) == "table" and source[key]
-        if key == "topStat" or key == "bottomStat" then value = oldStats[value] or value end
-        values[key] = restoredValue(field, value)
-    end
-    return true, settingsResult(values, readOnly)
-end
-
-function storage:Prepare(state, operation)
-    -- SND provides an isolated state copy and validates each edit before here.
-    local values = state.values
-    if operation.kind == "set" then
-        values[operation.path] = operation.value
-    elseif operation.kind == "patch" then
-        for key, value in pairs(operation.values) do values[key] = value end
-    else
-        return false, {code = "unsupported"}
-    end
-    return true, settingsResult(values, false)
-end
-
 app:Settings({
-    savedVariables = {"SpellStatsDB"},
-    adapter = storage,
+    savedVariables = {"SpellStatsProfiles"},
+    characterProfiles = true,
+    initialProfile = ns.InitialProfile,
     fields = {
         topStat = enum("amount", stats),
         bottomStat = enum("manaPercent", stats),
@@ -126,94 +62,122 @@ app:Settings({
     },
 })
 
+ns.InitializeProfiles(app)
+
 local function selectControl(key, label, choices)
     return {type = "select", id = key, key = key, label = label, choices = choices}
 end
 
--- Unmodified Holy Nova rank 6 at level 60. It heals and deals damage, so
--- every statistic can be previewed using the same cast on any character.
-local example = {isHeal = true, heal = 311, damage = 187, cost = 750, seconds = 1.5}
-local function createPreview(parent)
-    if parent.spellStatsPreview then return parent.spellStatsPreview end
+local function useUI(ok, value)
+    if not ok then error(value.message) end
+    return value
+end
 
-    local clip = CreateFrame("Frame", nil, parent)
-    clip:SetAllPoints(parent)
-    clip:SetClipsChildren(true)
-    local button = CreateFrame("Frame", nil, clip)
-    button:SetAllPoints(clip)
-    local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
-    icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
-    icon:SetTexture("Interface\\Icons\\Spell_Holy_HolyNova")
-    local rim = button:CreateTexture(nil, "ARTWORK", nil, 1)
-    rim:SetAllPoints(button)
-    rim:SetAtlas("UI-HUD-ActionBar-IconFrame")
-    button:EnableMouse(true)
-    button:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("Holy Nova preview", 1, 0.82, 0)
-        GameTooltip:AddLine("Rank 6 with 5,000 maximum mana.")
-        GameTooltip:Show()
-    end)
-    local function hideTooltip(self)
-        if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
-    end
-    button:SetScript("OnLeave", hideTooltip)
-    button:SetScript("OnHide", hideTooltip)
+local formLayout = {
+    columns = 2, minColumnWidth = 178, columnGap = 16,
+    fieldWidth = 200, minLabelWidth = 80, gap = 8, rowGap = 6,
+}
 
-    local version = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addon, "Version")
-    if version and version ~= "" then
-        local shell = parent:GetParent()
-        local footer = shell:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        footer:SetJustifyH("RIGHT")
-        footer:SetTextColor(0.70, 0.65, 0.55, 0.88)
-        footer:SetText(version)
-        -- Keep the native font inside the 16px footer, including in locales with taller glyphs.
-        local scale = math.min(1, 11 / math.max(1, footer:GetStringHeight()))
-        footer:SetScale(scale)
-        footer:SetPoint("BOTTOMRIGHT", shell, "BOTTOMRIGHT", -34 / scale, 4 / scale)
-        local backing = shell:CreateTexture(nil, "ARTWORK")
-        backing:SetColorTexture(0.08, 0.065, 0.045, 0.84)
-        backing:SetPoint("TOPLEFT", footer, "TOPLEFT", -3, 0)
-        backing:SetPoint("BOTTOMRIGHT", footer, "BOTTOMRIGHT", 3, -1)
-    end
+local function alignmentControl(line)
+    local key = line .. "Align"
+    return {type = "custom", id = key, create = function(parent, app, owner)
+        -- SND reuses the host across opens. Keep the three buttons and their artwork
+        -- with it, and bind clicks to the new component lifetime.
+        local group = parent.spellStatsAlignment
+        if not group then
+            local label = parent:CreateFontString(nil, "OVERLAY")
+            useUI(app.fonts:Apply(label, "control"))
+            label:SetText("Alignment")
+            label:SetJustifyH("LEFT")
+            group = {label = label, field = CreateFrame("Frame", nil, parent), buttons = {}}
+            for i, choice in ipairs(alignments) do
+                local button = useUI(app.ui:Control(group.field, choice.value, "button"))
+                local caption = button:CreateFontString(nil, "OVERLAY")
+                useUI(app.fonts:Apply(caption, "control"))
+                caption:SetText(choice.label)
+                caption:SetPoint("CENTER")
+                caption:SetWordWrap(true)
+                local mark = button:CreateTexture(nil, "OVERLAY")
+                mark:SetColorTexture(1, 1, 1, 1)
+                useUI(app.ui:Color(mark, "accent"))
+                mark:SetHeight(2)
+                mark:SetPoint("BOTTOMLEFT", 3, 2)
+                mark:SetPoint("BOTTOMRIGHT", -3, 2)
+                group.buttons[i] = {button = button, caption = caption, mark = mark}
+            end
+            parent.spellStatsAlignment = group
+        end
 
-    local record = {button = button}
-    parent.spellStatsPreview = {
-        Refresh = function()
-            clip:Show()
-            ns.PaintButtonStats(record, ns.GetSettings(), example, 5000)
-        end,
-        Layout = function(_, width) return width end,
-        Hide = function() clip:Hide() end,
-    }
-    return parent.spellStatsPreview
+        for i, choice in ipairs(alignments) do
+            local value = choice.value
+            group.buttons[i].button:SetScript("OnClick", owner:Guard(function()
+                if app:Get(line .. "Stat") == "none" then return end
+                local ok, err = app:Set(key, value)
+                if ok then ns.HighlightPreviewLine(line)
+                else app.log:Warn("Alignment change failed", {code = err.code}) end
+            end))
+        end
+        return {
+            Refresh = function()
+                local enabled = app:Get(line .. "Stat") ~= "none" and not app.profiles:Capabilities().readOnly
+                useUI(app.ui:Color(group.label, enabled and "text" or "muted"))
+                for i, item in ipairs(group.buttons) do
+                    local selected = app:Get(key) == alignments[i].value
+                    item.button:SetEnabled(enabled)
+                    item.mark:SetShown(selected)
+                    useUI(app.ui:Color(item.caption, selected and "accent" or "text"))
+                end
+            end,
+            Layout = function(_, width)
+                local gap = 3
+                local buttonWidth = (math.min(width, formLayout.fieldWidth) - 2 * gap) / 3
+                local height = 26
+                for _, item in ipairs(group.buttons) do
+                    item.caption:SetWidth(math.max(1, buttonWidth - 4))
+                    height = math.max(height, item.caption:GetStringHeight() + 8)
+                end
+                for i, item in ipairs(group.buttons) do
+                    item.button:ClearAllPoints()
+                    item.button:SetPoint("TOPLEFT", group.field, "TOPLEFT", (i - 1) * (buttonWidth + gap), 0)
+                    item.button:SetSize(buttonWidth, height)
+                end
+                group.field:SetHeight(height)
+                return useUI(app.layout:Row(parent, {
+                    width = width, label = group.label, control = group.field, layout = formLayout,
+                }))
+            end,
+            Hide = function() parent:Hide() end,
+        }
+    end}
+end
+
+local lines = {}
+for _, line in ipairs({"top", "bottom"}) do
+    local name = line == "top" and "Top" or "Bottom"
+    local stat, size = line .. "Stat", line .. "Size"
+    lines[#lines + 1] = selectControl(stat, name .. " line", stats)
+    lines[#lines + 1] = alignmentControl(line)
+    lines[#lines + 1] = {type = "slider", id = size, key = size, label = name .. " text size",
+        step = 1, editable = true, enabled = function(app) return app:Get(stat) ~= "none" end}
 end
 
 local options = app:Options({
     title = "SpellStats",
     width = 448,
-    height = 438,
-    header = {width = 46, create = createPreview},
-    layout = {
-        columns = 2, minColumnWidth = 178, columnGap = 16,
-        fieldWidth = 200, minLabelWidth = 80, gap = 8, rowGap = 6,
-    },
+    height = 456,
+    header = {width = 46, create = ns.CreatePreview},
+    subheader = {width = 210, create = ns.CreateProfileSelector},
+    layout = formLayout,
     pages = {
         {id = "display", label = "Display", sections = {
-            {title = "Action buttons", controls = {
-                selectControl("topStat", "Top stat", stats),
-                selectControl("bottomStat", "Bottom stat", stats),
-                selectControl("spellFilter", "Spells", filters),
-                selectControl("visibility", "When to show", visibility),
-            }},
+            {flow = "column", controls = lines},
             {title = "Text style", controls = {
                 {type = "font", key = "font", id = "font", label = "Font"},
                 selectControl("outline", "Outline", outlines),
-                selectControl("topAlign", "Top alignment", alignments),
-                selectControl("bottomAlign", "Bottom alignment", alignments),
-                {type = "slider", key = "topSize", id = "topSize", label = "Top text size", step = 1, editable = true},
-                {type = "slider", key = "bottomSize", id = "bottomSize", label = "Bottom text size", step = 1, editable = true},
+            }},
+            {title = "Visibility", controls = {
+                selectControl("spellFilter", "Spells", filters),
+                selectControl("visibility", "When to show", visibility),
             }},
         }},
     },

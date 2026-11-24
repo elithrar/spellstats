@@ -1,5 +1,11 @@
 local _, ns = ...
 local SND = ns.SomethingNeedDoing; local I = SND._
+-- Colons separate the parts of a pooled widget key (e.g. the value
+-- editor of a slider). A colon in an add-on's own ID is literal.
+local escapes = {[':']='%3A',['%']='%25'}
+local function keyPart(id)
+    return (id:gsub('[:%%]',escapes))
+end
 function SND.Pages.Profiles() return { id='profiles', label='Profiles', _profiles=true } end
 SND._install[#SND._install + 1] = function(app)
     function app:Options(spec)
@@ -20,9 +26,12 @@ SND._install[#SND._install + 1] = function(app)
         I.array(spec.pages, 'pages', true)
         I.check((spec.width==nil or (SND.Values.Number(spec.width) and spec.width>=160)) and (spec.height==nil or (SND.Values.Number(spec.height) and spec.height>=140)), 'invalid panel dimensions')
         spec.layout=I.formLayout(spec.layout)
-        if spec.header ~= nil then
-            I.check(I.plain(spec.header) and SND.Values.Number(spec.header.width) and spec.header.width>0
-                and type(spec.header.create)=='function', 'header requires a positive width and a component factory')
+        for _,slot in ipairs({'header','subheader'})do
+            local component=spec[slot]
+            if component~=nil then
+                I.check(I.plain(component) and SND.Values.Number(component.width) and component.width>0
+                    and type(component.create)=='function',slot..' requires a positive width and a component factory')
+            end
         end
         local pageIDs={}
         local function choices(entries)
@@ -32,9 +41,13 @@ SND._install[#SND._install + 1] = function(app)
         for _,page in ipairs(spec.pages)do
             I.check(I.plain(page) and type(page.id)=='string' and page.id~='' and not pageIDs[page.id], 'invalid or duplicate page id')
             pageIDs[page.id]=true
+            local pagePrefix=keyPart(page.id)..':'
+            page._tabKey=':tab:'..page.id
             I.array(page.sections==nil and {} or page.sections, 'sections')
-            for _,section in ipairs(page.sections or {})do
+            for si,section in ipairs(page.sections or {})do
                 I.check(I.plain(section),'section must be a plain table')
+                I.check(section.flow==nil or section.flow=='row' or section.flow=='column','section flow must be row or column')
+                section._titleKey=pagePrefix..'section:'..si
                 section.layout=I.formLayout(section.layout,spec.layout)
                 I.array(section.controls==nil and {} or section.controls,'controls')
                 local controlIDs={}
@@ -42,6 +55,7 @@ SND._install[#SND._install + 1] = function(app)
                     I.check(I.plain(c) and ({checkbox=true,slider=true,number=true,text=true,select=true,font=true,color=true,button=true,description=true,custom=true})[c.type], 'invalid control type')
                     I.check(c.id==nil or (type(c.id)=='string' and c.id~=''), 'control id must be a nonempty string')
                     local id=c.id or tostring(index);I.check(not controlIDs[id],'duplicate control id');controlIDs[id]=true
+                    c._poolKey=pagePrefix..si..':'..keyPart(id)
                     for _,key in ipairs({'enabled','visible','preview','action','create'})do I.check(c[key]==nil or type(c[key])=='function', key..' must be a function')end
                     if c.type=='custom' then I.check(type(c.create)=='function','custom requires create')
                     elseif c.type=='button' then I.check(type(c.action)=='function','button requires action')
@@ -95,6 +109,7 @@ SND._install[#SND._install + 1] = function(app)
             local b=ownedControl(id,parent,'button');b:SetSize(math.min(230,math.max(1,parent:GetWidth())),26)
             b.text=text(id..':text',b,label);panel._buttons[id]=b;b:SetScript('OnClick',action);fitButton(b);return b
         end
+        local textClose
         local function refreshClose()
             local shell = panel.frame
             local close
@@ -106,11 +121,14 @@ SND._install[#SND._install + 1] = function(app)
                     shell.onCloseCallback = function() panel:Close(); return false end
                 end
             else
-                close = panel._pool.textClose
-                if not close then
+                if not textClose then
+                    -- The native frame and label enter their pools before all
+                    -- setters succeed. Retry setup on those objects after failure.
                     close = button('textClose',shell,'×',function() panel:Close() end)
                     close:SetWidth(26);close:SetPoint('TOPRIGHT',-10,-10)
+                    textClose = close
                 end
+                close = textClose
                 fitButton(close)
             end
             local previous = panel._pool.close
@@ -157,33 +175,45 @@ SND._install[#SND._install + 1] = function(app)
             -- Detach the lifetime before native cleanup or consumer callbacks.
             -- A failure/reentrant hide must not strand a registered page scope.
             local view=self._view;self._view=nil
-            local components=self._components;self._components={}
             if view then view:Cancel()end
             self:_cancelEditors()
-            for _,component in pairs(components)do I.call(app,component.Hide,component)end
             self._deactivating=nil
         end
         local function color(control)
             local picker=ColorPickerFrame
-            if not picker or not picker.SetupColorPickerAndShow then return report(false,I.error('unavailable')) end
+            if not picker or not picker.SetupColorPickerAndShow or not picker.GetExtraInfo then return report(false,I.error('unavailable')) end
             panel:_cancelEditors()
-            local _,revision=app._settingsStore:Read()
-            local edit={original=app:Get(control.key),revision=revision,preview=control.preview,opening=true};panel._edit=edit
-            local function owns() return panel._edit==edit and picker:GetExtraInfo()==edit end
-            local function cancel()
-                if not owns() then return end
+            local function pickerOwns(edit)
+                local marker=picker:GetExtraInfo()
+                return SND.Values.Readable(marker) and rawequal(marker,edit)
+            end
+            local function restore(edit)
                 panel._edit=nil;if edit.preview then I.call(app,edit.preview,I.copy(edit.original)) end
             end
             if not panel._pickerHook then
-                local hooked, hook=app._system:HookScript(picker,'OnHide',function()
+                local owner=app:Scope()
+                local hooked, hook=owner:HookScript(picker,'OnHide',function()
                     local hidden=panel._edit
-                    app._system:After(0,'picker-hidden',function()
-                        if panel._edit==hidden and hidden and not picker:IsShown() then panel:_cancelEditors(true) end
+                    if not hidden then return end
+                    owner:After(0,'picker-hidden',function()
+                        if panel._edit==hidden and not picker:IsShown() then panel:_cancelEditors(true) end
                     end)
                 end)
-                if not hooked then panel._edit=nil;return report(false,hook)end
-                panel._pickerHook=hook
+                if hooked then
+                    -- Setup replaces the callback and extraInfo even if the
+                    -- singleton is already shown and never fires OnHide.
+                    hooked,hook=owner:PostHook(picker,'SetupColorPickerAndShow',function()
+                        local displaced=panel._edit
+                        if displaced and not pickerOwns(displaced) then restore(displaced) end
+                    end)
+                end
+                if not hooked then owner:Cancel();return report(false,hook)end
+                panel._pickerHook=owner
             end
+            local _,revision=app._settingsStore:Read()
+            local edit={original=app:Get(control.key),revision=revision,preview=control.preview,opening=true};panel._edit=edit
+            local function owns() return panel._edit==edit and pickerOwns(edit) end
+            local function cancel() if owns() then restore(edit) end end
             picker:SetupColorPickerAndShow({r=edit.original[1],g=edit.original[2],b=edit.original[3],hasOpacity=false,extraInfo=edit,
                 swatchFunc=function()
                     if not owns() then return end
@@ -231,8 +261,6 @@ SND._install[#SND._install + 1] = function(app)
         end
         local function dropdown(id,parent,entries,get,set)
             local d=ownedControl(id,parent,'dropdown');panel._menus[id]=d;d:SetSize(230,26)
-            -- Keep native menu/selection behavior, but own the closed control's
-            -- chrome. Forever's template artwork extends beyond its bounds.
             if not panel._menuFont then panel._menuFont=CreateFont(app.name..'_SND_Menu')end
             requireResource(app.fonts:Apply(panel._menuFont,'menu'))
             d:SetupMenu(function(_,root)
@@ -240,9 +268,13 @@ SND._install[#SND._install + 1] = function(app)
                 -- them. Reject their responders before they touch any owner.
                 local owner=panel._view
                 local revision=app._settingsStore and app._settingsStore._revision
-                local function choose(value)
+                local function choose(value,input)
                     if not owner or not owner.active or panel._view~=owner or not panel:IsShown() then return end
                     if app._settingsStore and app._settingsStore._revision~=revision then return end
+                    if d:GetMenuDescription()~=root then return end
+                    -- A wheel or stepper picks a radio on the current, closed
+                    -- dropdown. A mouse-button selection belongs to its popup.
+                    if not d:IsMenuOpen() and not (input and input.context==MenuInputContext.MouseWheel) then return end
                     set(value)
                 end
                 root:SetScrollMode(240)
@@ -259,6 +291,7 @@ SND._install[#SND._install + 1] = function(app)
                     local row=root:CreateRadio(entry.label,function(value)return I.equal(get(),value)end,choose,entry.value)
                     row:AddInitializer(function(native) if native.fontString then native.fontString:SetFontObject(panel._menuFont) end end)
                 end
+                requireResource(app.ui:StyleMenu(root))
             end)
             if d.Text and not d._captionHooks then
                 local owner=app:Scope()
@@ -313,15 +346,34 @@ SND._install[#SND._install + 1] = function(app)
         end
         local function customComponent(id,parent,specification,width)
             local container=frame(id,'Frame',parent)
+            local view=panel._view
+            if not view or not view.active then return container,0 end
             container:SetWidth(width);container:Show()
-            local component=panel._components[id]
-            if not component then
-                component=specification.create(container,app,panel._view)
+            if not view.active then return container,0 end
+            local lifetime=panel._components[id]
+            if not lifetime then
+                local scope=app:Scope()
+                lifetime=I.handle(view,function()
+                    panel._components[id]=nil
+                    scope:Cancel()
+                    if lifetime.component then I.call(app,lifetime.component.Hide,lifetime.component) end
+                    container:Hide()
+                end)
+                -- Own the scope before running consumer code so partial setup is
+                -- canceled even if the factory raises or closes the page itself.
+                panel._components[id]=lifetime
+                local component=specification.create(container,app,scope)
                 I.check(component and type(component.Refresh)=='function' and type(component.Layout)=='function'
                     and type(component.Hide)=='function','invalid custom component')
-                panel._components[id]=component
+                if not lifetime.active then
+                    I.call(app,component.Hide,component)
+                    return container,0
+                end
+                lifetime.component=component
             end
+            local component=lifetime.component
             component:Refresh()
+            if not lifetime.active then return container,0 end
             local height=component:Layout(width)
             I.check(SND.Values.Number(height) and height>=0,'custom layout must return a finite nonnegative height')
             container:SetHeight(height)
@@ -331,7 +383,18 @@ SND._install[#SND._install + 1] = function(app)
             local kind=c.type;local widget,label,group,entry
             local field=c.key and app._settingsFields and app._settingsFields[c.key]
             if c.key then I.check(field,'control binds unknown field: '..c.key) end
-            local function write(value) if not panel._refreshing then report(app:Set(c.key,value)) end end
+            local function write(value)
+                if panel._refreshing then return end
+                local ok,err=app:Set(c.key,value)
+                report(ok,err)
+                -- These controls move before their native callback. An adapter
+                -- can reject the gesture or normalize it to the existing value
+                -- without sending the settings notification that repaints them.
+                if kind=='checkbox' and widget:GetChecked()~=app:Get(c.key)
+                    or kind=='slider' and widget:GetValue()~=app:Get(c.key) then
+                    panel:Refresh()
+                end
+            end
             if kind=='custom' then
                 return customComponent(id,parent,c,width)
             elseif kind=='description' then
@@ -402,7 +465,12 @@ SND._install[#SND._install + 1] = function(app)
             local f=self._pool.shell;self.frame=f;f:Hide()
             f:SetSize(spec.width or 640,spec.height or 500);f:SetPoint('CENTER');f:SetFrameStrata('DIALOG');f:EnableMouse(true);f:SetMovable(true);f:RegisterForDrag('LeftButton')
             f:SetScript('OnDragStart',function()f:StartMoving()end);f:SetScript('OnDragStop',function()f:StopMovingOrSizing()end)
-            f:SetScript('OnHide',function()if not self._closing then self:_deactivate()end end);requireResource(app.ui:Style(f,'dialog'))
+            f:SetScript('OnHide',function()if not self._closing then self:_deactivate()end end)
+            f:SetScript('OnShow',function()
+                -- UIParent can hide and reveal a still-shown options shell.
+                if app._ready and not self._opening and not self._view then report(self:Open())end
+            end)
+            requireResource(app.ui:Style(f,'dialog'))
             local title=text('title',f,spec.title or app.name,'heading',{size=18});title:SetPoint('TOPLEFT',16,-16)
             local scroll=frame('scroll','ScrollFrame',f);self.scroll=scroll;scroll:SetPoint('TOPLEFT',16,-50);scroll:SetPoint('BOTTOMRIGHT',-16,16)
             local child=frame('body','Frame',scroll);self.body=child;scroll:SetScrollChild(child)
@@ -414,7 +482,7 @@ SND._install[#SND._install + 1] = function(app)
             end)
             scroll:EnableMouseWheel(true);scroll:SetScript('OnMouseWheel',function(_,delta)bar:SetValue(math.max(0,math.min(self._maximum or 0,(self._offsets[self._page] or 0)-delta*30)))end)
             for i,page in ipairs(tabs) do
-                local b=button('tab:'..page.id,f,page.label or page.id,function()report(self:SelectPage(page.id))end)
+                local b=button(page._tabKey,f,page.label or page.id,function()report(self:SelectPage(page.id))end)
                 local tabWidth=((spec.width or 640)-32-(#self._pages-1)*4)/#self._pages
                 b:SetSize(tabWidth,26);b:SetPoint('TOPLEFT',16+(i-1)*(tabWidth+4),-50)
                 if not b._selected then
@@ -513,13 +581,31 @@ SND._install[#SND._install + 1] = function(app)
             if page._profiles then y=self:_profiles()+12 end
             for si,section in ipairs(page.sections or {}) do
                 if section.title then
-                    local label=text(page.id..':section:'..si,self.body,section.title,'heading');label:ClearAllPoints();label:SetWidth(width);label:SetWordWrap(true);label:SetPoint('TOPLEFT',0,-y);y=y+label:GetStringHeight()+10
+                    local label=text(section._titleKey,self.body,section.title,'heading');label:ClearAllPoints();label:SetWidth(width);label:SetWordWrap(true);label:SetPoint('TOPLEFT',0,-y);y=y+label:GetStringHeight()+10
                 end
                 local columns,columnWidth=app.layout:Columns(width,section.layout)
                 local column,rowHeight=0,0
-                for ci,c in ipairs(section.controls or {}) do
-                    local id=page.id..':'..si..':'..(c.id or ci)
-                    if not c.visible or c.visible(app) then
+                local controls=section.controls or {}
+                local down=section.flow=='column' and columns>1
+                local shortColumn,extra
+                if down then
+                    local visible={}
+                    for _,c in ipairs(controls)do
+                        if not c.visible or c.visible(app) then visible[#visible+1]=c
+                        elseif self._components[c._poolKey] then self._components[c._poolKey]:Cancel() end
+                    end
+                    controls=visible
+                    shortColumn,extra=math.floor(#controls/columns),#controls%columns
+                end
+                for i,c in ipairs(controls) do
+                    if down then
+                        -- Layout still measures each visual row together. Read its cell
+                        -- from the authored column, giving the first columns any extra row.
+                        local first=1+column*shortColumn+math.min(column,extra)
+                        c=controls[first+math.floor((i-1)/columns)]
+                    end
+                    local id=c._poolKey
+                    if down or not c.visible or c.visible(app) then
                         local widget,height,label=control(id,self.body,c,columnWidth,section.layout)
                         local x=column*(columnWidth+section.layout.columnGap)
                         if c.type=='custom' then
@@ -538,7 +624,7 @@ SND._install[#SND._install + 1] = function(app)
                         end
                         rowHeight=math.max(rowHeight,height);column=column+1
                         if column==columns then y=y+rowHeight;column,rowHeight=0,0 end
-                    elseif self._components[id] then self._components[id]:Hide() end
+                    elseif self._components[id] then self._components[id]:Cancel() end
                 end
                 y=y+rowHeight
                 if si<#page.sections then y=y+12 end
@@ -554,7 +640,15 @@ SND._install[#SND._install + 1] = function(app)
             local titleWidth=frameWidth-76
             title:SetWidth(titleWidth);title:SetHeight(0);title:SetWordWrap(true)
             local headerBottom=math.max(48,title:GetStringHeight()+32,close:GetHeight()+24)
-            if not spec.header then return headerBottom end
+            local function leftHeight(available)
+                local titleHeight=title:GetStringHeight()
+                if not spec.subheader then return titleHeight end
+                local width=math.min(available,spec.subheader.width)
+                local host,height=customComponent('subheader',panel.frame,spec.subheader,width)
+                host:ClearAllPoints();host:SetPoint('TOPLEFT',16,-(16+titleHeight+4))
+                return titleHeight+4+height
+            end
+            if not spec.header then return math.max(headerBottom,24+leftHeight(frameWidth-32)) end
 
             local width=math.min(spec.header.width,frameWidth-32)
             local host,height=customComponent('header',panel.frame,spec.header,width)
@@ -562,19 +656,21 @@ SND._install[#SND._install + 1] = function(app)
             local beside=frameWidth-16-12-width-rightInset
             local captionWidth=title.GetUnboundedStringWidth and title:GetUnboundedStringWidth() or title:GetStringWidth()
             host:ClearAllPoints()
-            if beside>=math.min(120,captionWidth) then
+            local preferred=math.max(captionWidth,spec.subheader and spec.subheader.width or 0)
+            if beside>=math.min(120,preferred) then
                 title:SetWidth(beside)
-                local rowHeight=math.max(title:GetStringHeight(),height)
+                local rowHeight=math.max(leftHeight(beside),height)
                 host:SetPoint('TOPRIGHT',-rightInset,-16)
                 return math.max(close:GetHeight()+24,24+rowHeight)
             end
             -- Put the preview below the title when the close control and
             -- preview would otherwise squeeze the caption into a few letters.
+            headerBottom=math.max(headerBottom,24+leftHeight(frameWidth-32))
             host:SetPoint('TOPRIGHT',-16,-headerBottom)
             return headerBottom+height+12
         end
         function panel:Refresh()
-            if not self:IsShown() then return true end
+            if not self._view or not self:IsShown() then return true end
             if self._refreshing then self._refreshAgain=true;return true end
             if self:_menuOpen() then self._refreshPending=true;return true end
             self._refreshPending=nil
@@ -591,12 +687,12 @@ SND._install[#SND._install + 1] = function(app)
                 local count,tabWidth=app.layout:Columns(frameWidth-32,{columns=math.max(1,math.min(4,#tabs)),minColumnWidth=110,columnGap=4})
                 local rowHeight=0
                 for index,p in ipairs(tabs)do
-                    local b=self._pool['tab:'..p.id];b:SetWidth(tabWidth);fitButton(b)
+                    local b=self._pool[p._tabKey];b:SetWidth(tabWidth);fitButton(b)
                     rowHeight=math.max(rowHeight,b:GetHeight())
                     if index%count==0 or index==#self._pages then
                         local first=index-((index-1)%count)
                         for j=first,index do
-                            local tab=self._pool['tab:'..self._pages[j].id];tab:SetHeight(rowHeight)
+                            local tab=self._pool[self._pages[j]._tabKey];tab:SetHeight(rowHeight)
                             tab:ClearAllPoints();tab:SetPoint('TOPLEFT',16+(j-first)*(tabWidth+4),-tabY)
                         end
                         tabY=tabY+rowHeight+4;rowHeight=0
@@ -622,7 +718,7 @@ SND._install[#SND._install + 1] = function(app)
                     y=self:_layoutPage(page,width-16)
                 end
                 for _,p in ipairs(tabs)do
-                    local b=self._pool['tab:'..p.id];b._selected:SetShown(p.id==self._page)
+                    local b=self._pool[p._tabKey];b._selected:SetShown(p.id==self._page)
                     requireResource(app.ui:Color(b.text,p.id==self._page and 'accent' or 'muted'))
                 end
                 self.body:SetHeight(math.max(1,y));self._maximum=math.max(0,y-viewportHeight)
@@ -646,6 +742,10 @@ SND._install[#SND._install + 1] = function(app)
                 self:_deactivate()
                 if self:_menuOpen()then return false,I.error('build','Options menu could not be closed')end
                 if pageID then self._page=pageID end
+                if not self.frame:GetParent():IsVisible() then
+                    self.frame:Show() -- Its inherited OnShow will activate the requested page.
+                    return true
+                end
                 local owner=app:Scope();self._view=owner
                 if not self.frame:IsShown()then self.frame:Show()end
                 if self._view~=owner or not self.frame:IsShown()then return false,I.error('build','Options hidden during opening')end
