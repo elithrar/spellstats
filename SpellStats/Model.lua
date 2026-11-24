@@ -39,6 +39,7 @@ end
 -- Touch measured as if learned at level zero. Base growth uses client levels.
 local function spellPowerShare(spellID, rank, level)
     if rank.ranked == false or not rank.level or rank.level <= 0 then return 1 end
+    if not level then return end
     local learned = rank.level
     if spellID == 635 or spellID == 5185 then learned = 0 end
     local levelsPastWindow = math.max(0, level - learned - 17)
@@ -85,6 +86,70 @@ local function talentKnown(id)
     return observed("talent:" .. id, known, values.Readable(known) and type(known) == "boolean")
 end
 
+-- Only committed ranks of these two Forever traits modify shield capacity.
+-- Check the entry's definition before using a node from the client export.
+-- Nodes: https://zephras.com/data/forever/enUS/talents/1.60.1.70938.json
+-- Trait overrides: https://www.wowhead.com/forever/spell=14748 and spell=11189
+local shieldTalents = {
+    [14748] = {node = 105846, definition = 135376, 7, 14, 20}, -- Improved Power Word: Shield
+    [11189] = {node = 105780, definition = 135310, 10, 20},    -- Frost Warding
+}
+
+function ns.ClearShieldTalentRanks()
+    for _, talent in pairs(shieldTalents) do talent.config, talent.percent = nil, nil end
+end
+
+local function nativeID(getID, ...)
+    if getID then
+        local ok, id = pcall(getID, ...)
+        if ok and values.Number(id) and id > 0 then return id end
+    end
+end
+
+local function activeConfig()
+    local config = nativeID(C_ClassTalents and C_ClassTalents.GetActiveConfigID)
+    if config then return config end
+    local spec = C_SpecializationInfo
+    local group = nativeID(spec and spec.GetActiveSpecGroup)
+    if group then return nativeID(spec.GetCombatConfigIDForSpecGroup, group) end
+end
+
+local function committedPercent(config, talent)
+    local staged = C_Traits.ConfigHasStagedChanges(config)
+    if not values.Readable(staged) or type(staged) ~= "boolean" then return end
+    if staged then return talent.percent end
+    local node = C_Traits.GetNodeInfo(config, talent.node)
+    if not values.Readable(node) or type(node) ~= "table" then return end
+    local rank = node.activeRank
+    if not values.Number(rank) then return end
+    if rank == 0 then return 0 end
+    local active = node.activeEntry
+    if not values.Readable(active) or type(active) ~= "table" or not values.Number(active.entryID) then return end
+    local entry = C_Traits.GetEntryInfo(config, active.entryID)
+    if values.Readable(entry) and type(entry) == "table" and values.Number(entry.definitionID) then
+        if entry.definitionID ~= talent.definition then return 0 end
+        return talent[rank]
+    end
+end
+
+local function shieldMultiplier(id)
+    local talent = shieldTalents[id]
+    if not talent then return 1 end
+    local config = activeConfig()
+    if config then
+        if config ~= talent.config then talent.config, talent.percent = config, nil end
+        if C_Traits then
+            local read, percent = pcall(committedPercent, config, talent)
+            if read and percent then
+                if not InCombatLockdown() then talent.percent = percent end
+                return 1 + percent / 100
+            end
+        end
+    end
+    if InCombatLockdown() and talent.percent then return 1 + talent.percent / 100 end
+    return 1
+end
+
 function ns.RefreshPlayerStats()
     if InCombatLockdown() then return end
     playerLevel()
@@ -95,10 +160,17 @@ function ns.RefreshPlayerStats()
     playerSpirit()
     maxHealth()
     talentKnown(1328621) -- Bloom adds a Spirit-based component to druid heals.
+    if UnitClass then
+        local _, class = UnitClass("player")
+        if values.Readable(class) then
+            if class == "PRIEST" then shieldMultiplier(14748)
+            elseif class == "MAGE" then shieldMultiplier(11189) end
+        end
+    end
 end
 
 local function spellPower(rank, effect, kind)
-    if kind == "heal" then return bonusHealing() end
+    if kind == "heal" or (kind == "absorb" and not effect.school) then return bonusHealing() end
     if effect.school or not rank.schools then return schoolPower(effect.school or rank.school) end
     local highest
     for _, school in ipairs(rank.schools) do
@@ -117,6 +189,7 @@ local function magnitude(rank, effect, kind, level, share)
     end
     local amount = (effect.low + effect.high) / 2
     if effect.curve then
+        if not level then return end
         local constant, linear, quadratic = unpack(effect.curve)
         amount = amount * (constant + level * (linear + level * quadratic))
     end
@@ -131,14 +204,21 @@ local function magnitude(rank, effect, kind, level, share)
         amount = amount + health * effect.health
     end
     if effect.perLevel and effect.perLevel ~= 0 then
+        if not level then return end
         local last = math.min(level, effect.maxLevel or level)
         local gained = math.max(0, last - (effect.baseLevel or rank.level))
         amount = amount + effect.perLevel * gained
+        -- The client truncates level growth before adding shield power.
+        if kind == "absorb" then amount = math.floor(amount) end
     end
     if effect.sp and effect.sp ~= 0 then
+        -- Frost Ward and Ice Barrier explicitly add a share of Frost power
+        -- outside their rank-scaled base in the client tooltip formula.
+        local coefficientShare = effect.fullPower and 1 or share
+        if not coefficientShare then return end
         local power = spellPower(rank, effect, kind)
         if not power then return end
-        amount = amount + power * effect.sp * share
+        amount = amount + power * effect.sp * coefficientShare
     end
     if effect.ap and effect.ap ~= 0 then
         local power = meleePower()
@@ -150,6 +230,7 @@ local function magnitude(rank, effect, kind, level, share)
         if not power then return end
         amount = amount + power * effect.rap
     end
+    if kind == "absorb" and rank.absorbTalent then amount = amount * shieldMultiplier(rank.absorbTalent) end
     return math.max(0, amount) * (effect.ticks or 1)
 end
 
@@ -182,21 +263,24 @@ function ns.Estimate(spellID, includeTiming)
     local result = {cost = manaCost(spellID, rank), isHeal = false}
     if not rank then return result end
 
-    result.isHeal = rank.kind == "heal"
+    result.isHeal = rank.kind == "heal" or rank.kind == "absorb"
+    result.conditionalMana = rank.conditionalMana
     if #rank.components == 0 then return result end
 
     local level = playerLevel()
-    local share = level and spellPowerShare(spellID, rank, level)
-    local missingHeal, missingDamage = false, false
+    local share = spellPowerShare(spellID, rank, level)
+    local missingHeal, missingAbsorb, missingDamage = false, false, false
     for _, effect in ipairs(rank.components) do
         local kind = effect.kind or rank.kind
-        if kind == "heal" or effect.leech then result.isHeal = true end
-        local amount = level and magnitude(rank, effect, kind, level, share)
+        if kind == "heal" or kind == "absorb" or effect.leech then result.isHeal = true end
+        local amount = magnitude(rank, effect, kind, level, share)
         if amount then
             result[kind] = (result[kind] or 0) + amount
             -- Leech restores a fraction of the damage the spell deals. Use the
             -- same damage roll and damage-school power for both estimates.
             if effect.leech then result.heal = (result.heal or 0) + amount * effect.leech end
+        elseif kind == "absorb" then
+            missingAbsorb = true
         elseif kind == "heal" then
             missingHeal = true
         else
@@ -204,8 +288,14 @@ function ns.Estimate(spellID, includeTiming)
             if effect.leech then missingHeal = true end
         end
     end
-    -- Don't display the direct hit alone if a periodic part couldn't be read.
-    if missingHeal then result.heal = nil end
+    -- The healing display includes the capacity applied to one target. A
+    -- shield covering several schools still contributes its pool only once.
+    if missingAbsorb then result.absorb = nil end
+    if missingHeal or missingAbsorb then
+        result.heal = nil
+    elseif result.absorb then
+        result.heal = (result.heal or 0) + result.absorb
+    end
     if missingDamage then result.damage = nil end
     if includeTiming and (result.heal or result.damage) then
         result.seconds = applicationSeconds(spellID, rank, result.heal ~= nil)

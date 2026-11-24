@@ -22,7 +22,7 @@ function UnitAttackPower() return 0, 0, 0 end
 UnitRangedAttackPower = UnitAttackPower
 function UnitStat() return 0, 0 end
 C_SpellBook = {IsSpellKnown = function() return false end}
-local costs = {[27801] = 750, [6064] = 305, [25315] = 410, [25306] = 410}
+local costs = {[27801] = 750, [6064] = 305, [25315] = 410, [10901] = 500, [25306] = 410}
 C_Spell = {GetSpellPowerCost = function(id)
     return {{type = Enum.PowerType.Mana, cost = assert(costs[id])}}
 end}
@@ -178,16 +178,21 @@ for i, top in ipairs(currentChoices) do
     assert(labels[1].text == labels[3].text and labels[2].text == labels[4].text,
         "preview must agree with an action button showing the same Holy Nova")
 end
-assert(ns.App:SetMany({topStat = "amount", bottomStat = "perSecond"}))
-local sampleSpells = {{"Fireball", 25306}, {"Heal", 6064}, {"Renew", 25315}, {"Holy Nova", 27801}}
+local sampleSpells = {{"Fireball", 25306}, {"Heal", 6064}, {"Renew", 25315}, {"Power Word: Shield", 10901}, {"Holy Nova", 27801}}
+local sampleStats = {{"perMana", "manaPercent"}, {"amount", "perSecond"}}
 for _, sample in ipairs(sampleSpells) do
     previewButton.scripts.OnClick(previewButton)
     local choice = assert(menu.root.choices[sample[1]])
     choice.choose(choice.value)
     assert(choice.selected(choice.value), sample[1])
     menu:Close()
-    ns.PaintButtonStats(realButton, ns.GetSettings(), ns.Estimate(sample[2], true), 5000)
-    assert(labels[1].text == labels[3].text and labels[2].text == labels[4].text, sample[1])
+    local live = ns.Estimate(sample[2], true)
+    for _, pair in ipairs(sampleStats) do
+        assert(ns.App:SetMany({topStat = pair[1], bottomStat = pair[2]}))
+        preview:Refresh()
+        ns.PaintButtonStats(realButton, ns.GetSettings(), live, 5000)
+        assert(labels[1].text == labels[3].text and labels[2].text == labels[4].text, sample[1])
+    end
 end
 previewButton.scripts.OnClick(previewButton)
 local stale = menu.root.choices.Fireball

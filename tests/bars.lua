@@ -453,4 +453,76 @@ inCombat, healing, settings.visibility = false, 0, "always"
 events.PLAYER_REGEN_ENABLED()
 frame()
 assert(captures == before + 2 and eabLines[1].value == "45", "combat exit refreshes player stats, including zero")
+
+-- At level 20, Power Word: Shield rank 1 absorbs 48 before bonuses, costs
+-- 45 mana, and is applied on the 1.5-second global cooldown.
+local activeConfig, shieldRank = 1, 0
+C_ClassTalents = {GetActiveConfigID = function() return activeConfig end}
+C_Traits = {
+    ConfigHasStagedChanges = function() return false end,
+    GetNodeInfo = function(config, node)
+        assert(config == activeConfig and node == 105846)
+        return {activeRank = shieldRank, activeEntry = {entryID = 130575}}
+    end,
+    GetEntryInfo = function(config, entry)
+        assert(config == activeConfig and entry == 130575)
+        return {definitionID = 135376}
+    end,
+}
+primary.action, primary.visible = 119, true
+spells[119], charge = {"spell", 17}, 45
+events.ACTIONBAR_SLOT_CHANGED(119)
+frame()
+for _, lines in ipairs({primary.TextOverlayContainer.labels, eabLines}) do
+    assert(lines[1].value == "48" and lines[2].value == "4.5%", "the default heals filter includes shields on either bar")
+    assert(lines[1].color[2] > lines[1].color[1] and lines[2].color[3] > lines[2].color[2])
+end
+shieldRank = 3
+events.TRAIT_CONFIG_UPDATED(activeConfig)
+frame()
+assert(eabLines[1].value == "58" and top.value == "58" and bottom.value == "4.5%",
+    "committing Improved Power Word: Shield updates the already visible spell")
+for _, event in ipairs({"ACTIVE_COMBAT_CONFIG_CHANGED", "ACTIVE_TALENT_GROUP_CHANGED"}) do
+    local previous = activeConfig
+    inCombat, activeConfig = true, secret
+    events.PLAYER_REGEN_DISABLED()
+    frame()
+    assert(top.value == "58", "the same loadout keeps its last committed shield bonus in combat")
+    events[event](secret)
+    frame()
+    assert(top.value == "48", "an unreadable new loadout cannot borrow its predecessor's shield bonus")
+    inCombat, activeConfig = false, previous + 1
+    events.PLAYER_REGEN_ENABLED()
+    frame()
+    assert(top.value == "58", "readable committed ranks repopulate the new loadout")
+end
+activeConfig, shieldRank = 2, 0
+events.ACTIVE_COMBAT_CONFIG_CHANGED(activeConfig)
+frame()
+assert(eabLines[1].value == "48" and top.value == "48", "switching to an untalented loadout restores the base shield")
+settings.spellFilter, settings.topStat, settings.bottomStat = "all", "perSecond", "perMana"
+ns.RefreshBars()
+frame()
+assert(eabLines[1].value == "32" and eabLines[2].value == "1.07", "shield rates use applied capacity")
+settings.spellFilter, settings.topStat, settings.bottomStat = "heals", "perMana", "perSecond"
+inCombat = true
+events.PLAYER_REGEN_DISABLED()
+frame()
+assert(eabLines[1].value == "1.07" and eabLines[2].value == "32", "either row can show shield efficiency in combat")
+assert(eabLines[1].color[2] > eabLines[1].color[1] and eabLines[2].color[2] > eabLines[2].color[1])
+
+-- Mana Shield charges extra mana as it absorbs damage. The cast cost is
+-- known, even though its final efficiency cannot be shown in advance.
+spells[119], charge = {"spell", 1463}, 40
+events.ACTIONBAR_SLOT_CHANGED(119)
+frame()
+assert(eabLines[1].value == "" and eabLines[2].value == "80", "conditional mana only suppresses the per-mana row")
+settings.topStat, settings.bottomStat = "manaPercent", "amount"
+ns.RefreshBars()
+frame()
+assert(eabLines[1].value == "4%" and eabLines[2].value == "120")
+settings.topStat, settings.bottomStat = "manaCost", "perMana"
+ns.RefreshBars()
+frame()
+assert(eabLines[1].value == "40" and eabLines[2].value == "")
 print("Action button overlay checks passed.")

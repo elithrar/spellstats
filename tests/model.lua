@@ -4,7 +4,7 @@ assert(loadfile("SpellStats/Libs/SomethingNeedDoing/Core.lua"))("SpellStats", ns
 local secret = {}
 function issecretvalue(value) return value == secret end
 Enum = {PowerType = {Mana = 0}}
-local level, healing, damage, maxMana = 20, 100, 200, 1250
+local level, healing, damage, maxMana, health = 20, 100, 200, 1250, 2000
 local inCombat = false
 function InCombatLockdown() return inCombat end
 function UnitLevel() return level end
@@ -15,7 +15,7 @@ function GetSpellBonusDamage(school)
     return damage
 end
 function UnitPowerMax(unit, power) assert(unit == "player" and power == 0); return maxMana end
-function UnitHealthMax() return 2000 end
+function UnitHealthMax() return health end
 function UnitPower(unit, power) assert(unit == "player" and power == 0); return 900 end
 function UnitAttackPower() return 98, 4, -2 end
 function UnitRangedAttackPower() return 148, 5, -3 end
@@ -102,6 +102,99 @@ end
 near(ns.Estimate(25299).heal, 856) -- Rejuvenation XI, 4 x (194 + .2 * 100)
 near(ns.Estimate(774).heal, 40) -- first rank at level 60 retains 10% of its coefficient
 near(ns.Estimate(9858).heal, 2093.3) -- Regrowth IX, direct + seven ticks
+
+-- Client build 71037: one shared pool on a shield covering all seven schools.
+-- PW:S scales with bonus healing; the literal Frost tooltip formula uses
+-- Frost power even for low-rank Frost Ward, outside the downranked base.
+costs = {{type = 0, cost = 500}}
+local shield = ns.Estimate(10901, true)
+near(shield.absorb, 938) -- 928 + 10% of 100 healing
+assert(shield.heal == shield.absorb and shield.isHeal and shield.damage == nil)
+assert(shield.cost == 500 and not shield.conditionalMana and shield.seconds == 1.5)
+near(ns.Estimate(17).absorb, 49) -- 44 + 5 * 0.8 + 10% of downranked healing
+near(ns.Estimate(6065).absorb, 305.5) -- floor(291 + 5 * 2.3) + .1 * 100 * .35
+near(ns.Estimate(11426).absorb, 467) -- floor(431 + 6 * 2.8) + .1 * 200
+near(ns.Estimate(13033).absorb, 839)
+near(ns.Estimate(6143).absorb, 182) -- 162 + .1 * 200, no low-rank penalty
+level = 6
+near(ns.Estimate(17).absorb, 54)
+level, healing = 60, secret
+assert(ns.Estimate(10901).isHeal and ns.Estimate(10901).heal == nil)
+near(ns.Estimate(28609).absorb, 933) -- a Frost shield doesn't use bonus healing
+damage = secret
+assert(ns.Estimate(28609).absorb == nil)
+level, maxMana = secret, secret
+local fixed = ns.Estimate(543, true) -- Fire Ward has a fixed pool, no power term
+assert(fixed.absorb == 162 and fixed.heal == 162 and fixed.seconds == 1.5)
+for id, capacity in pairs({[6229] = 290, [11739] = 470, [11740] = 675, [28610] = 920}) do
+    local ward = ns.Estimate(id, true) -- Shadow Ward ranks from the supplemental data
+    assert(ward.isHeal and ward.absorb == capacity and ward.heal == capacity and ward.seconds == 1.5)
+end
+for _, id in ipairs({642, 324, 408696}) do -- Divine Shield, Lightning Shield, Spirit of the Alpha
+    assert(ns.Estimate(id).absorb == nil, "no absorb capacity for spell " .. id)
+end
+assert(ns.Estimate(11426).heal == nil and ns.MaxMana() == nil)
+costs = {{type = 0, cost = 140}}
+local manaShield = ns.Estimate(10193, true)
+assert(manaShield.absorb == 570 and manaShield.cost == 140 and manaShield.conditionalMana)
+assert(ns.Estimate(412120).absorb == 600 and ns.Estimate(412120).conditionalMana)
+local bulwark = ns.Estimate(1311015, true)
+assert(bulwark.absorb == 2000 and bulwark.seconds == nil)
+health = secret
+assert(ns.Estimate(1311015).heal == nil and ns.Estimate(1311015).isHeal)
+level, healing, damage, health = 60, 100, 200, 2000
+
+-- A single passive spell ID is shared by multiple ranks. Only a matching
+-- active definition in the committed config identifies the damage bonus.
+local config, staged, ranks = 31, false, {[105846] = 0, [105780] = 0}
+local definitions = {[130575] = 135376, [130509] = 135310}
+C_ClassTalents = {GetActiveConfigID = function() return config end}
+C_Traits = {
+    ConfigHasStagedChanges = function(id) assert(id == config); return staged end,
+    GetNodeInfo = function(id, node)
+        assert(id == config and ranks[node] ~= nil)
+        return {activeRank = ranks[node], activeEntry = {entryID = node == 105846 and 130575 or 130509}}
+    end,
+    GetEntryInfo = function(id, entry) assert(id == config); return {definitionID = definitions[entry]} end,
+}
+for rank, factor in ipairs({1.07, 1.14, 1.20}) do
+    ranks[105846] = rank
+    near(ns.Estimate(10901).heal, 938 * factor)
+end
+for rank, factor in ipairs({1.10, 1.20}) do
+    ranks[105780] = rank
+    near(ns.Estimate(13033).absorb, 839 * factor)
+    near(ns.Estimate(6143).absorb, 182 * factor)
+end
+staged, ranks[105846] = true, 1
+near(ns.Estimate(10901).heal, 938 * 1.20) -- uncommitted edits don't change the active rank
+config = 32
+near(ns.Estimate(10901).heal, 938) -- a staged new config cannot borrow the last config's rank
+staged = false
+near(ns.Estimate(10901).heal, 938 * 1.07)
+definitions[130575] = 135310
+near(ns.Estimate(10901).heal, 938) -- a readable, different talent is never the prior talent
+definitions[130575], ranks[105846] = 135376, 2
+near(ns.Estimate(10901).heal, 938 * 1.14)
+inCombat, ranks[105846] = true, secret
+near(ns.Estimate(10901).heal, 938 * 1.14) -- restricted rank with a confirmed config
+config = secret
+near(ns.Estimate(10901).heal, 938 * 1.14) -- same combat, even the config ID is restricted
+ns.ClearShieldTalentRanks() -- active group/config changed while its new ID is unreadable
+near(ns.Estimate(10901).heal, 938)
+inCombat, config, ranks[105846] = false, 31, 0
+near(ns.Estimate(10901).heal, 938)
+C_ClassTalents = nil
+C_SpecializationInfo = {
+    GetActiveSpecGroup = function() return 2 end,
+    GetCombatConfigIDForSpecGroup = function(group) assert(group == 2); return config end,
+}
+ranks[105846] = 1
+near(ns.Estimate(10901).heal, 938 * 1.07) -- Forever's alternate active group API
+C_ClassTalents = {GetActiveConfigID = function() return nil end}
+near(ns.Estimate(10901).heal, 938 * 1.07)
+C_ClassTalents, C_SpecializationInfo, C_Traits = nil, nil, nil
+
 bloomKnown = true
 near(ns.Estimate(25299).heal, 981) -- 125 effective Spirit once on expiration
 near(ns.Estimate(9858).heal, 2218.3)
@@ -129,7 +222,7 @@ for id, rank in pairs(ns.SpellData) do
     assert(estimate, id)
     for _, effect in ipairs(rank.components) do
         local stat = effect.kind or rank.kind
-        assert(stat == "heal" or stat == "damage", id)
+        assert(stat == "heal" or stat == "damage" or stat == "absorb", id)
         assert(estimate[stat] and estimate[stat] >= 0, id)
     end
     count = count + 1
@@ -206,6 +299,18 @@ assert(timed.heal == 0 and timed.damage == 20 and timed.seconds == 2)
 healing = secret
 timed = ns.Estimate(hybridID, true)
 assert(timed.heal == nil and timed.damage == 20 and timed.seconds == 7)
+
+-- An instant shield supplements the same target's heal. If a required stat
+-- is unreadable the combined amount is unknown; independent damage survives.
+ns.SpellData[hybridID].components[1] = {kind = "heal", low = 5, high = 5}
+ns.SpellData[hybridID].components[3] = {kind = "absorb", low = 60, high = 60, sp = .1}
+ns.SpellData[hybridID].healDuration = 3
+healing = 100
+timed = ns.Estimate(hybridID, true)
+assert(timed.isHeal and timed.heal == 75 and timed.absorb == 70 and timed.damage == 20 and timed.seconds == 5)
+healing = secret
+timed = ns.Estimate(hybridID, true)
+assert(timed.isHeal and timed.heal == nil and timed.absorb == nil and timed.damage == 20 and timed.seconds == 7)
 
 inCombat, healing = true, 100
 for _, unreadable in ipairs({secret, {castTime = secret}, {castTime = -1}, {castTime = math.huge}}) do

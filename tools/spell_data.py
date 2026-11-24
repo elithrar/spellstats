@@ -19,8 +19,13 @@ def lookup(pattern, text, default=None):
 
 
 damage.update("""Wrack|Incinerate|Lava Burst|Ice Lance|Arcane Blast|Chastise|Frostfire Bolt|Chaos Bolt|Arcane Barrage|Mind Spike|Shadow Word: Death|Vampiric Touch|Void Plague|Starsurge|Sunfire|Molten Blast""".split("|"))
-# Ice Lance 1–6 from the build 70959 trainer levels.
+# Learn levels from the build 70959 trainer data. Advanced Warding's
+# friendly-target replacements occupy the corresponding trained ward ranks.
+ward_levels = {"Fire Ward": (20, 30, 40, 50, 60), "Frost Ward": (22, 32, 42, 52, 60),
+               "Mana Shield": (20, 28, 36, 44, 52, 60)}
+shields = set(ward_levels) | {"Power Word: Shield", "Ice Barrier", "Templar's Bulwark"}
 levels = {1312002:20, 400640:28, 1240044:34, 1240045:42, 1240046:48, 1240047:56}
+levels.update({11426:40, 13031:46, 13032:52, 13033:58})
 caps = {}
 for line in (spc / "Data.lua").read_text().splitlines():
     match = re.match(r'  \[(\d+)\] = { n=', line)
@@ -60,6 +65,11 @@ for path in sorted((game / "spells").glob("*/*.txt")):
             spell = Spell(block.strip())
             book[spell.id] = spell
 
+for spell in book.values():
+    trained = ward_levels.get(spell.name)
+    if trained and spell.rank and 1 <= int(spell.rank) <= len(trained):
+        levels.setdefault(spell.id, trained[int(spell.rank) - 1])
+
 
 class UnknownEffect(Exception):
     """A required part of the cast cannot be reconstructed from these inputs."""
@@ -89,7 +99,7 @@ def measure(spell, parent, raw, summary, p, kind, ticks, curve=False):
             raise UnknownEffect
         out["curve"] = [float(x) for x in m.groups()]
     if p.get("ppl"):
-        key = ("h" if kind == "heal" else "d") + ("t" if "PERIODIC" in raw else "")
+        key = {"heal": "h", "damage": "d", "absorb": "a"}[kind] + ("t" if "PERIODIC" in raw else "")
         limits = caps.get((spell.id, key))
         if not limits:
             # Pulse spells sometimes store the rank levels on the cast record.
@@ -98,7 +108,7 @@ def measure(spell, parent, raw, summary, p, kind, ticks, curve=False):
             # Recover the cap only when the displayed level-60 amount has a
             # unique solution given the rank level, variance and per-level term.
             start = levels.get(parent.id)
-            displayed = re.match(r"([\d.]+)(?:–([\d.]+))?", summary)
+            displayed = re.match(r"(?:absorbs )?([\d.]+)(?:–([\d.]+))?", summary)
             candidates = []
             if start and displayed and "at level 60" in summary:
                 for cap in range(start, 61):
@@ -106,6 +116,10 @@ def measure(spell, parent, raw, summary, p, kind, ticks, curve=False):
                     if displayed[2]:
                         matches = (math.floor(out["low"] + extra + 1e-5) == float(displayed[1])
                                    and math.ceil(out["high"] + extra - 1e-5) == float(displayed[2]))
+                    elif kind == "absorb":
+                        # Unlike numeric direct hits, the export renders shield
+                        # capacities as whole points (447 for 431 + 6 * 2.8).
+                        matches = math.floor(base + extra + 1e-5) == float(displayed[1])
                     else:
                         matches = abs(base + extra - float(displayed[1])) < .006
                     if matches:
@@ -127,6 +141,11 @@ def direct_effects(spell, parent, repeats=1):
             kind = "heal"
         elif raw.startswith(("E_SCHOOL_DAMAGE ", "E_HEALTH_LEECH ")) or re.search(r' A_PERIODIC_(DAMAGE|LEECH) ', raw):
             kind = "damage"
+        elif (spell.name in shields and raw.startswith(("E_APPLY_AURA A_SCHOOL_ABSORB ", "E_APPLY_AURA A_MANA_SHIELD "))
+              and 0 < p.get("misc", 0) <= 127):
+            # The school mask restricts incoming hits that can consume this
+            # single shield. Each target gets one pool, even for mask 127.
+            kind = "absorb"
         else:
             continue
         # Binding Heal duplicates the same amount onto the caster.
@@ -143,6 +162,14 @@ def direct_effects(spell, parent, repeats=1):
                                                  "Vampiric Touch", "Void Plague", "Starsurge", "Sunfire", "Molten Blast"}:
             curve = "$<damagepower>" in parent.tooltip or "$<power>" in parent.tooltip
         effect = measure(spell, parent, raw, summary, p, kind, ticks, curve)
+        if kind == "absorb":
+            if "$s1% of your maximum health" in spell.tooltip:
+                effect = dict(kind=kind, low=0, high=0, health=p["base"] / 100)
+            frost_share = lookup(r'\$SPFR\*([\d.]+)', spell.tooltip)
+            if frost_share:
+                # This explicit tooltip term uses the caster's Frost damage
+                # bonus, separate from ordinary ranked spell coefficients.
+                effect.update(sp=float(frost_share), school=schools.index("frost") + 1, fullPower=True)
         if raw.startswith("E_HEALTH_LEECH ") or " A_PERIODIC_LEECH " in raw:
             # The client calls this field EffectAmplitude. It multiplies damage
             # actually dealt to obtain the caster's healing on each hit or tick.
@@ -233,22 +260,29 @@ def literal(v):
     return format(v, ".7g")
 
 
+def emit(spell_id, name, rank, record):
+    label = f"{name} {rank}" if rank else name
+    print(f'    [{spell_id}] = {literal(record)}, -- {label}')
+
+
 print("""-- Numeric spell effects and base timing (seconds) from the Blizzard Forever 1.60.1.71037 client export:
 -- https://github.com/wowsims/gamedata/tree/0c2b3f0dff123ea052afd3dbef43c1490907d419/spells
 -- Learn levels and per-level caps from SpellPowerCoefficients 1.0.2 (70888/70862):
 -- https://www.curseforge.com/wow/addons/spc-forever/files/9739224
--- Hunter RAP shares (15% Arcane Shot; 25% over 5 Serpent Sting ticks) and Ice Lance rank levels:
+-- Hunter RAP shares (15% Arcane Shot; 25% over 5 Serpent Sting ticks) and mage rank levels:
 -- https://www.curseforge.com/wow/addons/dynamictooltips/files/9705865
--- See THIRD-PARTY.txt for the latter data's MIT notice. Regenerate with tools/spell_data.py.
+-- Shadow Ward rank values missing from the primary export: https://foreverdb.net/spell/6229 (71037).
+-- Effect and timing: https://db.icy-veins.com/wow-forever/spells/6229 (and the other rank IDs).
+-- See THIRD-PARTY.txt for attribution. Regenerate with tools/spell_data.py.
 local _, ns = ...
 ns.SpellData = {""")
 for spell in sorted(book.values(), key=lambda s: (s.name, s.id)):
-    if spell.name not in heals | damage or not spell.school or not spell.tooltip:
+    if spell.name not in heals | damage | shields or not spell.school or not spell.tooltip:
         continue
     if not re.search(r'^cost |^gcd ', spell.block, re.M):
         continue
     if spell.id not in levels and spell.name not in {"Lifebloom", "Bloodthirst", "Victory Rush", "Arcane Shot",
-                                                     "Lay on Hands", "Lightwell", "Swiftmend", "Healing Rain", "Serpent Sting"}:
+                                                     "Lay on Hands", "Lightwell", "Swiftmend", "Healing Rain", "Serpent Sting", "Templar's Bulwark"}:
         continue
     if spell.name == "Victory Rush" and spell.id != 402927:
         continue
@@ -258,7 +292,7 @@ for spell in sorted(book.values(), key=lambda s: (s.name, s.id)):
         out = []
     if not out and spell.name not in heals:
         continue
-    kind = "heal" if spell.name in heals else "damage"
+    kind = "heal" if spell.name in heals else "absorb" if spell.name in shields else "damage"
     indices = [schools.index(name) + 1 for name in spell.school.split("+")]
     record = dict(kind=kind, school=indices[0])
     if len(indices) > 1:
@@ -269,11 +303,27 @@ for spell in sorted(book.values(), key=lambda s: (s.name, s.id)):
         record["ranked"] = False
     if spell.name == "Lay on Hands":
         record["allMana"] = True
+    if spell.name == "Mana Shield":
+        record["conditionalMana"] = True
+    if spell.name == "Power Word: Shield":
+        record["absorbTalent"] = 14748  # Improved Power Word: Shield
+    elif "$11189s3" in spell.tooltip and kind == "absorb":
+        record["absorbTalent"] = 11189  # Frost Warding, on its trained spells
     record.update(timing(spell, out))
     for c in out:
         if c["kind"] == kind:
             del c["kind"]
     record["components"] = out
-    rank = " " + spell.rank if spell.rank else ""
-    print(f'    [{spell.id}] = {literal(record)}, -- {spell.name}{rank}')
+    emit(spell.id, spell.name, spell.rank, record)
+
+# The pinned class export omits this trained Warlock ward. Snapshot the four
+# 71037 rank capacities from the source cited above. The 70959 Warlock data
+# explicitly gives every rank a zero coefficient; the self-cast shield is instant.
+# Matching spell IDs, trainer levels and capacities are also preserved at:
+# https://github.com/alcaras/forever-ref/blob/6ea29f802d087e00790645d4b4d7334725fd0515/builds/1.60.1.70532.json.gz
+shadow_ward = [(6229, 32, 290), (11739, 42, 470), (11740, 52, 675), (28610, 60, 920)]
+for rank, (spell_id, level, capacity) in enumerate(shadow_ward, 1):
+    record = dict(kind="absorb", school=schools.index("shadow") + 1, level=level, cast=0, gcd=1.5,
+                  components=[dict(low=capacity, high=capacity)])
+    emit(spell_id, "Shadow Ward", rank, record)
 print("}")

@@ -4,7 +4,7 @@
 
 <img src="icon.png" alt="A pixel-art mana crystal with an emerald eye" width="96" height="96" align="right">
 
-SpellStats shows what a cast will heal or damage and how much mana it will cost, right on your World of Warcraft: Forever action buttons, including EllesmereUI Action Bars. By default, healing spells show the estimated median heal on top and the percentage of your maximum mana spent on the bottom, both in and out of combat.
+SpellStats shows healing, shield absorbs, damage, and mana costs on your World of Warcraft: Forever action buttons, including EllesmereUI Action Bars. By default, heals and shields show the estimated amount on top and the percentage of your maximum mana spent on the bottom, both in and out of combat.
 
 <img width="451" height="340" alt="image" src="https://github.com/user-attachments/assets/c4327e9f-a67e-4f78-b787-0c161c5b65f5" />
 <img width="857" height="880" alt="image" src="https://github.com/user-attachments/assets/b51fd26a-5bbe-459d-88bc-b0937a8e00ae" />
@@ -13,7 +13,7 @@ SpellStats shows what a cast will heal or damage and how much mana it will cost,
 
 For a manual install, extract the ZIP into your Forever client’s `Interface/AddOns/` directory and restart WoW. SomethingNeedDoing is bundled.
 
-Open settings with `/spellstats`, `/spellstats opts` or `/spellstats options`. Click the preview button in the upper right to try Holy Nova, Heal, Renew or Fireball, even with empty action bars. Editing a line highlights it on the preview.
+Open settings with `/spellstats`, `/spellstats opts` or `/spellstats options`. Click the preview button in the upper right to try spells such as Power Word: Shield, Renew, or Fireball, even with empty action bars. Editing a line highlights it on the preview.
 
 | Setting | Choices |
 | --- | --- |
@@ -24,6 +24,8 @@ Open settings with `/spellstats`, `/spellstats opts` or `/spellstats options`. C
 | Size and alignment | Drag each row’s slider or type a font size from 1 to 64 and press Enter. Both rows start left-aligned. You can center or right-align either row. |
 
 Estimates use rank-specific coefficients and assume a noncritical cast on one target with all ticks completed. If WoW hides a player attribute such as spell power during combat, SpellStats uses its last readable out-of-combat value. Target mitigation, overhealing, and some talent modifiers can change the result.
+
+Power Word: Shield, Ice Barrier, Fire Ward, Frost Ward, Shadow Ward, Mana Shield, and Templar’s Bulwark count as heals. The amount is how much damage a fresh shield can absorb. Power Word: Shield includes bonus healing and your rank of Improved Power Word: Shield when available. An instant shield on the global cooldown uses that cooldown for HPS. Mana Shield shows its upfront mana cost and leaves HPM blank because it spends additional mana as it absorbs damage.
 
 HPS/DPS averages one cast over the time it takes to deliver its healing or damage. It uses the current cast time when available, otherwise the rank’s base cast time. Global cooldowns, channels and periodic effects use their base durations. For example, a Renew that heals 930 over 15 seconds shows 62 HPS. If there is no measurable time window, the row stays blank.
 

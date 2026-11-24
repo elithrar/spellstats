@@ -9,6 +9,8 @@ local samples = {
         estimate = {heal = 673.5, cost = 305, seconds = 3}},
     {name = "Renew", rank = 10, icon = "Spell_Holy_Renew", detail = "Healing over 15 seconds",
         estimate = {heal = 830, cost = 410, seconds = 15}},
+    {name = "Power Word: Shield", rank = 10, icon = "Spell_Holy_PowerWordShield", detail = "Instant shield, no talents",
+        estimate = {heal = 928, absorb = 928, cost = 500, seconds = 1.5}},
     {name = "Fireball", rank = 12, icon = "Spell_Fire_FlameBolt", detail = "Direct damage and 8 seconds of burning",
         estimate = {damage = 543, cost = 410, seconds = 11.5}},
 }
@@ -93,6 +95,7 @@ function ns.CreatePreview(parent, app, scope)
         GameTooltip:SetOwner(button, "ANCHOR_LEFT")
         GameTooltip:AddLine(selected.name .. " preview", 1, 0.82, 0)
         GameTooltip:AddLine(selected.detail .. " (Rank " .. selected.rank .. ").")
+        if selected.estimate.absorb then GameTooltip:AddLine("Healing stats count the full shield when it is applied.") end
         GameTooltip:AddLine("Level 60, 5,000 maximum mana, no bonus spell power.")
         GameTooltip:AddLine("Click to choose a preview spell.", 0.8, 0.8, 0.8)
         GameTooltip:Show()

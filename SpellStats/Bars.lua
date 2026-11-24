@@ -90,6 +90,7 @@ local function statistic(stat, estimate, maxMana)
     if stat == "amount" then
         return compact(amount), kind
     elseif stat == "perMana" or stat == "perSecond" then
+        if stat == "perMana" and estimate.conditionalMana then return end
         local denominator = estimate[stat == "perMana" and "cost" or "seconds"]
         if values.Number(denominator) and denominator > 0 then
             local rate = amount / denominator
@@ -375,10 +376,16 @@ function ns.StartBars(owner, ownerScope)
         "PLAYER_DAMAGE_DONE_MODS", "SPELL_POWER_CHANGED", "PLAYER_EQUIPMENT_CHANGED",
         "SPELLS_CHANGED", "PLAYER_LEVEL_UP", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
         "ENCOUNTER_START", "ENCOUNTER_END",
-        "PLAYER_TALENT_UPDATE", "UPDATE_SHAPESHIFT_FORM", "ACTIVE_TALENT_GROUP_CHANGED",
+        "PLAYER_TALENT_UPDATE", "TRAIT_CONFIG_UPDATED", "UPDATE_SHAPESHIFT_FORM",
     }) do
         listen(event, invalidate)
     end
+    local function activeTalentsChanged()
+        ns.ClearShieldTalentRanks()
+        invalidate()
+    end
+    listen("ACTIVE_COMBAT_CONFIG_CHANGED", activeTalentsChanged)
+    listen("ACTIVE_TALENT_GROUP_CHANGED", activeTalentsChanged)
     local function dataChanged(id)
         if values.Number(id) and estimates[id] ~= nil then
             estimates[id] = nil

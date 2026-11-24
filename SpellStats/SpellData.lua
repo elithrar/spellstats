@@ -2,9 +2,11 @@
 -- https://github.com/wowsims/gamedata/tree/0c2b3f0dff123ea052afd3dbef43c1490907d419/spells
 -- Learn levels and per-level caps from SpellPowerCoefficients 1.0.2 (70888/70862):
 -- https://www.curseforge.com/wow/addons/spc-forever/files/9739224
--- Hunter RAP shares (15% Arcane Shot; 25% over 5 Serpent Sting ticks) and Ice Lance rank levels:
+-- Hunter RAP shares (15% Arcane Shot; 25% over 5 Serpent Sting ticks) and mage rank levels:
 -- https://www.curseforge.com/wow/addons/dynamictooltips/files/9705865
--- See THIRD-PARTY.txt for the latter data's MIT notice. Regenerate with tools/spell_data.py.
+-- Shadow Ward rank values missing from the primary export: https://foreverdb.net/spell/6229 (71037).
+-- Effect and timing: https://db.icy-veins.com/wow-forever/spells/6229 (and the other rank IDs).
+-- See THIRD-PARTY.txt for attribution. Regenerate with tools/spell_data.py.
 local _, ns = ...
 ns.SpellData = {
     [400610] = {kind="damage", school=7, ranked=false, cast=0, gcd=1.5, components={{low=3.58, high=4.38, sp=0.429, curve={13.82812, 0.018012, 0.044141}}}}, -- Arcane Barrage
@@ -168,6 +170,16 @@ ns.SpellData = {
     [400621] = {kind="damage", school=3, level=38, cast=0, gcd=0, components={{low=242, high=290, sp=0.429, perLevel=2.2, baseLevel=0, maxLevel=43}}}, -- Fire Blast 5
     [400622] = {kind="damage", school=3, level=46, cast=0, gcd=0, components={{low=332, high=394, sp=0.429, perLevel=2.6, baseLevel=0, maxLevel=51}}}, -- Fire Blast 6
     [400623] = {kind="damage", school=3, level=54, cast=0, gcd=0, components={{low=431, high=509, sp=0.429, perLevel=3, baseLevel=0, maxLevel=59}}}, -- Fire Blast 7
+    [543] = {kind="absorb", school=3, level=20, cast=0, gcd=1.5, components={{low=162, high=162}}}, -- Fire Ward 1
+    [8457] = {kind="absorb", school=3, level=30, cast=0, gcd=1.5, components={{low=285, high=285}}}, -- Fire Ward 2
+    [8458] = {kind="absorb", school=3, level=40, cast=0, gcd=1.5, components={{low=463, high=463}}}, -- Fire Ward 3
+    [10223] = {kind="absorb", school=3, level=50, cast=0, gcd=1.5, components={{low=668, high=668}}}, -- Fire Ward 4
+    [10225] = {kind="absorb", school=3, level=60, cast=0, gcd=1.5, components={{low=913, high=913}}}, -- Fire Ward 5
+    [412214] = {kind="absorb", school=3, level=20, cast=0, gcd=1.5, components={{low=330, high=330}}}, -- Fire Ward 1
+    [412218] = {kind="absorb", school=3, level=30, cast=0, gcd=1.5, components={{low=580, high=580}}}, -- Fire Ward 2
+    [412230] = {kind="absorb", school=3, level=40, cast=0, gcd=1.5, components={{low=940, high=940}}}, -- Fire Ward 3
+    [412231] = {kind="absorb", school=3, level=50, cast=0, gcd=1.5, components={{low=1350, high=1350}}}, -- Fire Ward 4
+    [412232] = {kind="absorb", school=3, level=60, cast=0, gcd=1.5, components={{low=1840, high=1840}}}, -- Fire Ward 5
     [133] = {kind="damage", school=3, level=1, cast=1.5, gcd=1.5, damageDuration=4, components={{low=14, high=22, sp=0.429, perLevel=0.2, baseLevel=1, maxLevel=5}, {low=1, high=1, ticks=2}}}, -- Fireball 1
     [143] = {kind="damage", school=3, level=6, cast=2, gcd=1.5, damageDuration=6, components={{low=26.10526, high=37.89474, sp=0.571, perLevel=0.3, baseLevel=6, maxLevel=10}, {low=1, high=1, ticks=3}}}, -- Fireball 2
     [145] = {kind="damage", school=3, level=12, cast=2.5, gcd=1.5, damageDuration=6, components={{low=42.90476, high=59.09524, sp=0.714, perLevel=0.6, baseLevel=12, maxLevel=16}, {low=2, high=2, ticks=3}}}, -- Fireball 3
@@ -213,6 +225,16 @@ ns.SpellData = {
     [8058] = {kind="damage", school=5, level=34, cast=0, gcd=1.5, components={{low=214.7042, high=229.2958, sp=0.386, perLevel=1.3, baseLevel=34, maxLevel=39}}}, -- Frost Shock 2
     [10472] = {kind="damage", school=5, level=46, cast=0, gcd=1.5, components={{low=344.6501, high=365.3499, sp=0.386, perLevel=1.5, baseLevel=46, maxLevel=51}}}, -- Frost Shock 3
     [10473] = {kind="damage", school=5, level=58, cast=0, gcd=1.5, components={{low=491.832, high=520.168, sp=0.386, perLevel=1.8, baseLevel=58, maxLevel=63}}}, -- Frost Shock 4
+    [6143] = {kind="absorb", school=5, level=22, absorbTalent=11189, cast=0, gcd=1.5, components={{low=162, high=162, sp=0.1, school=5, fullPower=true}}}, -- Frost Ward 1
+    [8461] = {kind="absorb", school=5, level=32, absorbTalent=11189, cast=0, gcd=1.5, components={{low=284, high=284, sp=0.1, school=5, fullPower=true}}}, -- Frost Ward 2
+    [8462] = {kind="absorb", school=5, level=42, absorbTalent=11189, cast=0, gcd=1.5, components={{low=463, high=463, sp=0.1, school=5, fullPower=true}}}, -- Frost Ward 3
+    [10177] = {kind="absorb", school=5, level=52, absorbTalent=11189, cast=0, gcd=1.5, components={{low=668, high=668, sp=0.1, school=5, fullPower=true}}}, -- Frost Ward 4
+    [28609] = {kind="absorb", school=5, level=60, absorbTalent=11189, cast=0, gcd=1.5, components={{low=913, high=913, sp=0.1, school=5, fullPower=true}}}, -- Frost Ward 5
+    [412202] = {kind="absorb", school=5, level=22, cast=0, gcd=1.5, components={{low=330, high=330}}}, -- Frost Ward 1
+    [412205] = {kind="absorb", school=5, level=32, cast=0, gcd=1.5, components={{low=580, high=580}}}, -- Frost Ward 2
+    [412207] = {kind="absorb", school=5, level=42, cast=0, gcd=1.5, components={{low=940, high=940}}}, -- Frost Ward 3
+    [412209] = {kind="absorb", school=5, level=52, cast=0, gcd=1.5, components={{low=1350, high=1350}}}, -- Frost Ward 4
+    [412210] = {kind="absorb", school=5, level=60, cast=0, gcd=1.5, components={{low=1840, high=1840}}}, -- Frost Ward 5
     [116] = {kind="damage", school=5, level=4, cast=1.5, gcd=1.5, components={{low=18, high=20, sp=0.407, perLevel=0.2, baseLevel=4, maxLevel=8}}}, -- Frostbolt 1
     [205] = {kind="damage", school=5, level=8, cast=1.8, gcd=1.5, components={{low=27.24242, high=30.75758, sp=0.489, perLevel=0.3, baseLevel=8, maxLevel=12}}}, -- Frostbolt 2
     [837] = {kind="damage", school=5, level=14, cast=2.2, gcd=1.5, components={{low=43.44444, high=48.55556, sp=0.597, perLevel=0.5, baseLevel=14, maxLevel=18}}}, -- Frostbolt 3
@@ -298,6 +320,10 @@ ns.SpellData = {
     [16914] = {kind="damage", school=4, level=40, cast=0, gcd=1.5, channel=10, components={{low=68, high=68, ticks=10, sp=0.03, perLevel=0.2, baseLevel=40, maxLevel=46}}}, -- Hurricane 1
     [17401] = {kind="damage", school=4, level=50, cast=0, gcd=1.5, channel=10, components={{low=98, high=98, ticks=10, sp=0.03, perLevel=0.2, baseLevel=50, maxLevel=56}}}, -- Hurricane 2
     [17402] = {kind="damage", school=4, level=60, cast=0, gcd=1.5, channel=10, components={{low=132, high=132, ticks=10, sp=0.03, perLevel=0.3, baseLevel=60, maxLevel=60}}}, -- Hurricane 3
+    [11426] = {kind="absorb", school=5, level=40, absorbTalent=11189, cast=0, gcd=1.5, components={{low=431, high=431, perLevel=2.8, baseLevel=40, maxLevel=46, sp=0.1, school=5, fullPower=true}}}, -- Ice Barrier 1
+    [13031] = {kind="absorb", school=5, level=46, absorbTalent=11189, cast=0, gcd=1.5, components={{low=542, high=542, perLevel=3.2, baseLevel=46, maxLevel=52, sp=0.1, school=5, fullPower=true}}}, -- Ice Barrier 2
+    [13032] = {kind="absorb", school=5, level=52, absorbTalent=11189, cast=0, gcd=1.5, components={{low=671, high=671, perLevel=3.6, baseLevel=52, maxLevel=58, sp=0.1, school=5, fullPower=true}}}, -- Ice Barrier 3
+    [13033] = {kind="absorb", school=5, level=58, absorbTalent=11189, cast=0, gcd=1.5, components={{low=811, high=811, perLevel=4, baseLevel=58, maxLevel=60, sp=0.1, school=5, fullPower=true}}}, -- Ice Barrier 4
     [1240044] = {kind="damage", school=5, level=34, cast=0, gcd=1.5, components={{low=41.25, high=48.75, perLevel=0.5, baseLevel=34, maxLevel=40}}}, -- Ice Lance 3
     [1240046] = {kind="damage", school=5, level=48, cast=0, gcd=1.5, components={{low=89.83333, high=106.1667, perLevel=0.7, baseLevel=48, maxLevel=56}}}, -- Ice Lance 5
     [1240047] = {kind="damage", school=5, level=56, cast=0, gcd=1.5, components={{low=132.9167, high=157.0833, perLevel=0.9, baseLevel=56, maxLevel=60}}}, -- Ice Lance 6
@@ -348,6 +374,18 @@ ns.SpellData = {
     [724] = {kind="heal", school=2, cast=1.5, gcd=1.5, components={}}, -- Lightwell 1
     [27870] = {kind="heal", school=2, cast=1.5, gcd=1.5, components={}}, -- Lightwell 2
     [27871] = {kind="heal", school=2, cast=1.5, gcd=1.5, components={}}, -- Lightwell 3
+    [1463] = {kind="absorb", school=7, level=20, conditionalMana=true, cast=0, gcd=1.5, components={{low=120, high=120}}}, -- Mana Shield 1
+    [8494] = {kind="absorb", school=7, level=28, conditionalMana=true, cast=0, gcd=1.5, components={{low=210, high=210}}}, -- Mana Shield 2
+    [8495] = {kind="absorb", school=7, level=36, conditionalMana=true, cast=0, gcd=1.5, components={{low=300, high=300}}}, -- Mana Shield 3
+    [10191] = {kind="absorb", school=7, level=44, conditionalMana=true, cast=0, gcd=1.5, components={{low=390, high=390}}}, -- Mana Shield 4
+    [10192] = {kind="absorb", school=7, level=52, conditionalMana=true, cast=0, gcd=1.5, components={{low=480, high=480}}}, -- Mana Shield 5
+    [10193] = {kind="absorb", school=7, level=60, conditionalMana=true, cast=0, gcd=1.5, components={{low=570, high=570}}}, -- Mana Shield 6
+    [412116] = {kind="absorb", school=7, level=20, conditionalMana=true, cast=0, gcd=1.5, components={{low=240, high=240}}}, -- Mana Shield 1
+    [412118] = {kind="absorb", school=7, level=28, conditionalMana=true, cast=0, gcd=1.5, components={{low=420, high=420}}}, -- Mana Shield 2
+    [412120] = {kind="absorb", school=7, level=36, conditionalMana=true, cast=0, gcd=1.5, components={{low=600, high=600}}}, -- Mana Shield 3
+    [412121] = {kind="absorb", school=7, level=44, conditionalMana=true, cast=0, gcd=1.5, components={{low=780, high=780}}}, -- Mana Shield 4
+    [412122] = {kind="absorb", school=7, level=52, conditionalMana=true, cast=0, gcd=1.5, components={{low=960, high=960}}}, -- Mana Shield 5
+    [412123] = {kind="absorb", school=7, level=60, conditionalMana=true, cast=0, gcd=1.5, components={{low=1140, high=1140}}}, -- Mana Shield 6
     [136] = {kind="heal", school=4, level=12, cast=0, gcd=1.5, channel=5, components={{low=20, high=20, ticks=5, sp=0.14}}}, -- Mend Pet 1
     [3111] = {kind="heal", school=4, level=20, cast=0, gcd=1.5, channel=5, components={{low=38, high=38, ticks=5, sp=0.2}}}, -- Mend Pet 2
     [3661] = {kind="heal", school=4, level=28, cast=0, gcd=1.5, channel=5, components={{low=68, high=68, ticks=5, sp=0.2}}}, -- Mend Pet 3
@@ -387,6 +425,16 @@ ns.SpellData = {
     [1240720] = {kind="heal", school=2, level=40, cast=0, gcd=1.5, channel=2, components={{kind="damage", low=50, high=50, ticks=3, sp=0.19, perLevel=0.33, baseLevel=40, maxLevel=49}, {low=200, high=200, ticks=3, sp=0.19, perLevel=0.98, baseLevel=40, maxLevel=49}}}, -- Penance 2
     [1240721] = {kind="heal", school=2, level=50, cast=0, gcd=1.5, channel=2, components={{kind="damage", low=68, high=68, ticks=3, sp=0.19, perLevel=0.43, baseLevel=50, maxLevel=59}, {low=268, high=268, ticks=3, sp=0.19, perLevel=1.27, baseLevel=50, maxLevel=59}}}, -- Penance 3
     [1316995] = {kind="heal", school=2, level=60, cast=0, gcd=1.5, channel=2, components={{kind="damage", low=92, high=92, ticks=3, sp=0.19}, {low=425, high=425, ticks=3, sp=0.19}}}, -- Penance 4
+    [17] = {kind="absorb", school=2, level=6, absorbTalent=14748, cast=0, gcd=1.5, components={{low=44, high=44, sp=0.1, perLevel=0.8, baseLevel=6, maxLevel=11}}}, -- Power Word: Shield 1
+    [592] = {kind="absorb", school=2, level=12, absorbTalent=14748, cast=0, gcd=1.5, components={{low=86, high=86, sp=0.1, perLevel=1.2, baseLevel=12, maxLevel=17}}}, -- Power Word: Shield 2
+    [600] = {kind="absorb", school=2, level=18, absorbTalent=14748, cast=0, gcd=1.5, components={{low=154, high=154, sp=0.1, perLevel=1.6, baseLevel=18, maxLevel=23}}}, -- Power Word: Shield 3
+    [3747] = {kind="absorb", school=2, level=24, absorbTalent=14748, cast=0, gcd=1.5, components={{low=226, high=226, sp=0.1, perLevel=2, baseLevel=24, maxLevel=29}}}, -- Power Word: Shield 4
+    [6065] = {kind="absorb", school=2, level=30, absorbTalent=14748, cast=0, gcd=1.5, components={{low=291, high=291, sp=0.1, perLevel=2.3, baseLevel=30, maxLevel=35}}}, -- Power Word: Shield 5
+    [6066] = {kind="absorb", school=2, level=36, absorbTalent=14748, cast=0, gcd=1.5, components={{low=368, high=368, sp=0.1, perLevel=2.6, baseLevel=36, maxLevel=41}}}, -- Power Word: Shield 6
+    [10898] = {kind="absorb", school=2, level=42, absorbTalent=14748, cast=0, gcd=1.5, components={{low=470, high=470, sp=0.1, perLevel=3, baseLevel=42, maxLevel=47}}}, -- Power Word: Shield 7
+    [10899] = {kind="absorb", school=2, level=48, absorbTalent=14748, cast=0, gcd=1.5, components={{low=591, high=591, sp=0.1, perLevel=3.4, baseLevel=48, maxLevel=53}}}, -- Power Word: Shield 8
+    [10900] = {kind="absorb", school=2, level=54, absorbTalent=14748, cast=0, gcd=1.5, components={{low=749, high=749, sp=0.1, perLevel=3.9, baseLevel=54, maxLevel=59}}}, -- Power Word: Shield 9
+    [10901] = {kind="absorb", school=2, level=60, absorbTalent=14748, cast=0, gcd=1.5, components={{low=928, high=928, sp=0.1, perLevel=4.3, baseLevel=60, maxLevel=65}}}, -- Power Word: Shield 10
     [596] = {kind="heal", school=2, level=30, cast=3, gcd=1.5, components={{low=172.2765, high=183.7235, sp=0.286, perLevel=0.8, baseLevel=30, maxLevel=39}}}, -- Prayer of Healing 1
     [996] = {kind="heal", school=2, level=40, cast=3, gcd=1.5, components={{low=256.8996, high=273.1004, sp=0.286, perLevel=1, baseLevel=40, maxLevel=49}}}, -- Prayer of Healing 2
     [10960] = {kind="heal", school=2, level=50, cast=3, gcd=1.5, components={{low=389.7293, high=412.2707, sp=0.286, perLevel=1.3, baseLevel=50, maxLevel=59}}}, -- Prayer of Healing 3
@@ -531,6 +579,7 @@ ns.SpellData = {
     [417157] = {kind="damage", school=7, ranked=false, cast=0, gcd=1.5, components={{low=2.48, high=3.04, sp=0.429, curve={9.183105, 0.616405, 0.028608}}}}, -- Starsurge
     [414684] = {kind="damage", school=4, ranked=false, cast=0, gcd=1.5, damageDuration=12, components={{low=0.65, high=0.65, ticks=4, sp=0.13, curve={9.183105, 0.616405, 0.028608}}, {low=1.3, high=1.52, sp=0.15, curve={9.183105, 0.616405, 0.028608}}}}, -- Sunfire
     [18562] = {kind="heal", school=4, ranked=false, cast=0, gcd=1.5, components={}}, -- Swiftmend
+    [1311015] = {kind="absorb", school=2, ranked=false, cast=0, gcd=0, components={{low=0, high=0, health=1}}}, -- Templar's Bulwark
     [740] = {kind="heal", school=4, level=30, cast=0, gcd=1.5, channel=10, components={{low=87, high=87, ticks=5, sp=0.067, perLevel=0.6, baseLevel=30, maxLevel=36}}}, -- Tranquility 1
     [8918] = {kind="heal", school=4, level=40, cast=0, gcd=1.5, channel=10, components={{low=129, high=129, ticks=5, sp=0.067, perLevel=0.7, baseLevel=40, maxLevel=46}}}, -- Tranquility 2
     [9862] = {kind="heal", school=4, level=50, cast=0, gcd=1.5, channel=10, components={{low=196, high=196, ticks=5, sp=0.067, perLevel=0.9, baseLevel=50, maxLevel=56}}}, -- Tranquility 3
@@ -550,4 +599,8 @@ ns.SpellData = {
     [6780] = {kind="damage", school=4, level=38, cast=2, gcd=1.5, components={{low=50.71622, high=57.28378, sp=0.571, perLevel=0.9, baseLevel=38, maxLevel=44}}}, -- Wrath 6
     [8905] = {kind="damage", school=4, level=46, cast=2, gcd=1.5, components={{low=64.24121, high=71.75879, sp=0.571, perLevel=0.9, baseLevel=46, maxLevel=52}}}, -- Wrath 7
     [9912] = {kind="damage", school=4, level=54, cast=2, gcd=1.5, components={{low=85.904, high=96.096, sp=0.571, perLevel=1, baseLevel=54, maxLevel=60}}}, -- Wrath 8
+    [6229] = {kind="absorb", school=6, level=32, cast=0, gcd=1.5, components={{low=290, high=290}}}, -- Shadow Ward 1
+    [11739] = {kind="absorb", school=6, level=42, cast=0, gcd=1.5, components={{low=470, high=470}}}, -- Shadow Ward 2
+    [11740] = {kind="absorb", school=6, level=52, cast=0, gcd=1.5, components={{low=675, high=675}}}, -- Shadow Ward 3
+    [28610] = {kind="absorb", school=6, level=60, cast=0, gcd=1.5, components={{low=920, high=920}}}, -- Shadow Ward 4
 }
