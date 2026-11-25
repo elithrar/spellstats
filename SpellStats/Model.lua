@@ -284,7 +284,7 @@ local function procChannelSeconds(rank)
 end
 
 local function applicationSeconds(spellID, rank, healing)
-    if healing and rank.triggeredHeal then return end -- delivery depends on a later hit or heal
+    if healing and rank.triggeredHeal then return end -- delivery starts after a separate trigger
     local elapsed = rank.channel
     if rank.channelAura then
         local ok, duration = pcall(procChannelSeconds, rank)

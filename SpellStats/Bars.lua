@@ -163,7 +163,11 @@ local function measureCaption(caption, rect)
 end
 
 local function rowInset(line, edge, anchor, left, bottom, width, height, captions)
-    if not line.value or not left then return 2 end
+    if not line.value then return 2 end
+    if not left then
+        -- A transiently unresolved overlay can still use its last inset.
+        return (captions and line.anchor == anchor and line.inset) or 2
+    end
     local textWidth, textHeight = line.text:GetStringWidth(), line.text:GetStringHeight()
     if not values.Number(textWidth) or not values.Number(textHeight) then return 2 end
     local rowLeft = left + (width - textWidth) * anchor.fraction + anchor.x
@@ -206,10 +210,12 @@ local function layoutRows(record, settings)
     local topAnchor = anchors[settings.topAlign] or anchors.LEFT
     local bottomAnchor = anchors[settings.bottomAlign] or anchors.LEFT
     local left, base, width, height
-    local captions = record.captions
+    local captions
     if button.Name or button.HotKey or button.Count then
+        captions = record.captions
         left, base, width, height = owner:GetRect()
-        if values.Number(left) and values.Number(base) and values.Number(width) and values.Number(height) then
+        if values.Number(left) and values.Number(base) and
+            values.Number(width) and width > 0 and values.Number(height) and height > 0 then
             if not captions then
                 captions = {{}, {}, {}}
                 record.captions = captions

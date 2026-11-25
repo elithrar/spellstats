@@ -319,6 +319,12 @@ for _, helper in ipairs({401863, 401877, 401880, 1280349}) do
     local proc = ns.Estimate(helper, true)
     assert(proc.heal == nil and proc.damage == nil and proc.seconds == nil)
 end
+-- Lightwell estimates one complete heal after an ally uses a charge.
+for _, row in ipairs({{724, 800, 225}, {27870, 1165, 295}, {27871, 1600, 365}}) do
+    costs = {{type = 0, cost = row[3]}}
+    local well = ns.Estimate(row[1], true)
+    assert(well.isHeal and well.heal == row[2] and well.cost == row[3] and well.seconds == nil)
+end
 -- Arcane Wrath's 5% of maximum mana adds spell power before downranking.
 maxMana = 1000
 for _, row in ipairs({{1326079, 25, 120}, {1326080, 36, 187}, {1326081, 48, 300}, {1326082, 60, 451}}) do

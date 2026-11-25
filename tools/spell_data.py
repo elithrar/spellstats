@@ -24,6 +24,9 @@ damage.update("""Wrack|Incinerate|Lava Burst|Ice Lance|Arcane Blast|Chastise|Fro
 # friendly-target replacements occupy the corresponding trained ward ranks.
 ward_levels = {"Fire Ward": (20, 30, 40, 50, 60), "Frost Ward": (22, 32, 42, 52, 60),
                "Mana Shield": (20, 28, 36, 44, 52, 60)}
+# The class export omits the Lightwell Renew helpers. Each charge heals
+# its recipient every two seconds for ten seconds, with no power coefficient.
+lightwell_ticks = {7001: 160, 27873: 233, 27874: 320}
 shields = set(ward_levels) | {"Power Word: Shield", "Ice Barrier", "Templar's Bulwark"}
 levels = {1312002:20, 400640:28, 1240044:34, 1240045:42, 1240046:48, 1240047:56}
 levels.update({11426:40, 13031:46, 13032:52, 13033:58})
@@ -223,8 +226,13 @@ def components(spell):
     if name in {"Holy Nova", "Holy Shock", "Penance", "Lightwell", "Blizzard", "Hurricane",
                 "Flamestrike", "Rain of Fire", "Healing Rain", "Healing Stream Totem", "Arcane Missiles", "Consecration"}:
         for hit_id in dict.fromkeys(hit_ids):
-            helper = book.get(int(hit_id))
+            helper_id = int(hit_id)
+            helper = book.get(helper_id)
             if not helper:
+                if name == "Lightwell" and helper_id in lightwell_ticks:
+                    value = lightwell_ticks[helper_id]
+                    out.append(dict(kind="heal", low=value, high=value, ticks=5))
+                    continue
                 raise UnknownEffect
             repeats = {"Penance": 3, "Flamestrike": 4, "Rain of Fire": 4}.get(name, 1)
             if name in {"Blizzard", "Hurricane", "Arcane Missiles", "Healing Rain"}:
@@ -288,6 +296,7 @@ print("""-- Numeric spell effects and base timing (seconds) from the Blizzard Fo
 -- https://www.curseforge.com/wow/addons/dynamictooltips/files/9705865
 -- Shadow Ward rank values missing from the primary export: https://foreverdb.net/spell/6229 (71037).
 -- Effect and timing: https://db.icy-veins.com/wow-forever/spells/6229 (and the other rank IDs).
+-- Lightwell Renew rank values missing from the primary export: https://foreverdb.net/spell/7001.
 -- See THIRD-PARTY.txt for attribution. Regenerate with tools/spell_data.py.
 local _, ns = ...
 ns.SpellData = {""")
@@ -320,8 +329,9 @@ for spell in sorted(book.values(), key=lambda s: (s.name, s.id)):
         record["allMana"] = True
     if spell.name == "Mana Shield":
         record["conditionalMana"] = True
-    if spell.name == "Prayer of Mending":
+    if spell.name in {"Lightwell", "Prayer of Mending"}:
         record["triggeredHeal"] = True
+    if spell.name == "Prayer of Mending":
         record["healTalents"] = [1225132, 14898]  # $twinD * $spiritualH in all three cast tooltips
     if spell.name == "Renew":
         record["healTalents"] = [14908, 1225132, 14898]  # Improved Renew, Twin Disciplines, Spiritual Healing

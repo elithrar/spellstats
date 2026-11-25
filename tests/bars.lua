@@ -140,6 +140,19 @@ ns.RefreshBars()
 frame()
 assert(top.at == "TOPRIGHT" and top.x == -2 and top.y == -14 and top.justify == "RIGHT")
 assert(bottom.at == "BOTTOM" and bottom.x == 0 and bottom.y == 2 and bottom.justify == "CENTER")
+local overlay = primary.TextOverlayContainer
+local normalRect = overlay.GetRect
+overlay.GetRect = function() end
+events.UPDATE_BINDINGS()
+frame()
+assert(top.y == -14, "unavailable button geometry preserves the last safe inset")
+overlay.GetRect = function() return 0, 0, 45, 50 end
+events.UPDATE_BINDINGS()
+frame()
+assert(top.y == -19, "refresh remeasures the caption inset once geometry returns")
+overlay.GetRect = normalRect
+events.UPDATE_BINDINGS()
+frame()
 local preview = {button = newButton(0)}
 preview.button.HotKey = primary.HotKey
 ns.PaintButtonStats(preview, settings, totals[774], maxMana)

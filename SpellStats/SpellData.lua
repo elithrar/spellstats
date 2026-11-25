@@ -6,6 +6,7 @@
 -- https://www.curseforge.com/wow/addons/dynamictooltips/files/9705865
 -- Shadow Ward rank values missing from the primary export: https://foreverdb.net/spell/6229 (71037).
 -- Effect and timing: https://db.icy-veins.com/wow-forever/spells/6229 (and the other rank IDs).
+-- Lightwell Renew rank values missing from the primary export: https://foreverdb.net/spell/7001.
 -- See THIRD-PARTY.txt for attribution. Regenerate with tools/spell_data.py.
 local _, ns = ...
 ns.SpellData = {
@@ -393,9 +394,9 @@ ns.SpellData = {
     [10392] = {kind="damage", school=4, level=44, cast=2.5, gcd=1.5, components={{low=226.3545, high=253.6455, sp=0.714, perLevel=1.5, baseLevel=44, maxLevel=49}}}, -- Lightning Bolt 8
     [15207] = {kind="damage", school=4, level=50, cast=2.5, gcd=1.5, components={{low=278.1658, high=311.8342, sp=0.714, perLevel=1.6, baseLevel=50, maxLevel=55}}}, -- Lightning Bolt 9
     [15208] = {kind="damage", school=4, level=56, cast=2.5, gcd=1.5, components={{low=333.8758, high=372.1242, sp=0.714, perLevel=2.1, baseLevel=56, maxLevel=61}}}, -- Lightning Bolt 10
-    [724] = {kind="heal", school=2, cast=1.5, gcd=1.5, components={}}, -- Lightwell 1
-    [27870] = {kind="heal", school=2, cast=1.5, gcd=1.5, components={}}, -- Lightwell 2
-    [27871] = {kind="heal", school=2, cast=1.5, gcd=1.5, components={}}, -- Lightwell 3
+    [724] = {kind="heal", school=2, triggeredHeal=true, cast=1.5, gcd=1.5, components={{low=160, high=160, ticks=5}}}, -- Lightwell 1
+    [27870] = {kind="heal", school=2, triggeredHeal=true, cast=1.5, gcd=1.5, components={{low=233, high=233, ticks=5}}}, -- Lightwell 2
+    [27871] = {kind="heal", school=2, triggeredHeal=true, cast=1.5, gcd=1.5, components={{low=320, high=320, ticks=5}}}, -- Lightwell 3
     [1463] = {kind="absorb", school=7, level=20, conditionalMana=true, cast=0, gcd=1.5, components={{low=120, high=120}}}, -- Mana Shield 1
     [8494] = {kind="absorb", school=7, level=28, conditionalMana=true, cast=0, gcd=1.5, components={{low=210, high=210}}}, -- Mana Shield 2
     [8495] = {kind="absorb", school=7, level=36, conditionalMana=true, cast=0, gcd=1.5, components={{low=300, high=300}}}, -- Mana Shield 3

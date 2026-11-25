@@ -27,10 +27,10 @@ Estimates use rank-specific coefficients and assume a noncritical cast on one ta
 
 Power Word: Shield, Ice Barrier, Fire Ward, Frost Ward, Shadow Ward, Mana Shield, and Templar’s Bulwark count as heals. The amount is how much damage a fresh shield can absorb. Power Word: Shield includes bonus healing and your rank of Improved Power Word: Shield when available. An instant shield on the global cooldown uses that cooldown for HPS. Mana Shield shows its upfront mana cost and leaves HPM blank because it spends additional mana as it absorbs damage.
 
-HPS/DPS averages one cast over the time it takes to deliver its healing or damage. Renew uses all 15 seconds and includes Improved Renew. Both Renew and Prayer of Mending account for Twin Disciplines and Spiritual Healing. Prayer of Mending shows one trigger and leaves HPS blank because the next qualifying hit or heal determines when it triggers. Health Funnel counts healing delivered to your pet.
+HPS/DPS averages one cast over the time it takes to deliver its healing or damage. Renew uses all 15 seconds and includes Improved Renew. Both Renew and Prayer of Mending account for Twin Disciplines and Spiritual Healing. Prayer of Mending shows one trigger and leaves HPS blank because the next qualifying hit or heal determines when it triggers. Lightwell shows the healing from one charge and leaves HPS blank because the recipient chooses when to use it. Health Funnel counts healing delivered to your pet.
 
 Rates use the current cast time when available and otherwise use the rank’s base timing. Missile Barrage halves the channel time for Arcane Missiles. If WoW restricts access to the proc, its DPS row stays blank. Arcane Wrath includes the contribution from maximum mana, and Consecration shows all eight pulses on one enemy.
 
 ## License
 
-SpellStats code is licensed under [Apache 2.0](LICENSE). For bundled components, see the [SomethingNeedDoing license](SpellStats/Libs/SomethingNeedDoing/LICENSE) and [spell data notice](SpellStats/THIRD-PARTY.txt). The [release tooling](tools/XPISLAND-LICENSE.txt) uses the BSD 3-Clause license.
+SpellStats code is licensed under [Apache 2.0](LICENSE). For bundled components, see the [SomethingNeedDoing license](https://github.com/elithrar/spellstats/blob/main/SpellStats/Libs/SomethingNeedDoing/LICENSE) and [spell data notice](https://github.com/elithrar/spellstats/blob/main/SpellStats/THIRD-PARTY.txt). The [release tooling](https://github.com/elithrar/spellstats/blob/main/tools/XPISLAND-LICENSE.txt) uses the BSD 3-Clause license.
