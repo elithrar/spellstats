@@ -6,8 +6,9 @@
 
 SpellStats shows healing, shield absorbs, damage, and mana costs on your World of Warcraft: Forever action buttons, including EllesmereUI Action Bars. By default, heals and shields show the estimated amount on top and the percentage of your maximum mana spent on the bottom, both in and out of combat.
 
-<img width="451" height="340" alt="image" src="https://github.com/user-attachments/assets/c4327e9f-a67e-4f78-b787-0c161c5b65f5" />
-<img width="857" height="880" alt="image" src="https://github.com/user-attachments/assets/b51fd26a-5bbe-459d-88bc-b0937a8e00ae" />
+<img width="815" height="356" alt="image" src="https://github.com/user-attachments/assets/7e723b47-7a58-4acc-9fd6-01801ce5c5ac" />
+<img width="815" alt="image" src="https://github.com/user-attachments/assets/408ca5e0-31dd-4d46-a15b-e14e44efceb9" />
+
 
 ## Installation
 
